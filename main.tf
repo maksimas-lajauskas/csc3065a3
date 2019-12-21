@@ -24,17 +24,21 @@ resource "google_container_cluster" "primary" {
 resource "google_container_node_pool" "primary_preemptible_nodes" {
     name = "csc3065a3-pool"
     location = "us-west1"
-    cluster = "google_container_cluster".primary.name
+    cluster = "csc3065a3-cluster"
     node_count = 1
 
     node_config {
         preemptible = true
-        machine_time = "n1-standard-1"
-    }
+        machine_type = "n1-standard-1"
 
-    oauth_scopes = [
+        oauth_scopes = [
         "https://www.googleapis.com/auth/logging.write",
         "https://www.googleapis.com/auth/monitoring"
-    ]
+        ]
+    }
 
+    timeouts {
+        create = "30m"
+        update = "40m"
+    }
 }
