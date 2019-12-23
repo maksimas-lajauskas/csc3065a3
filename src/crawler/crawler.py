@@ -13,4 +13,6 @@ if True:
 
     #check if has record in DB
 
+    #reverse dns lookup oneliner
+#   socket.gethostbyaddr(addr_str)[0]
     #((record exists && time to revisit) || norecord )? continue : next IP
