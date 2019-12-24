@@ -3,16 +3,26 @@ import requests
 import socket
 from random import getrandbits
 from ipaddress import IPv4Address
+import requests
+import sys
+from bs4 import BeautifulSoup
 
-if True:
-    #step1 pick IP
-    bits = getrandbits(32)
-    addr = IPv4Address(bits)
-    addr_str = str(addr)
-    print(addr_str)
+while True:
+    try:
+        #random ip
+        bits = getrandbits(32)
+        addr = IPv4Address(bits)
+        addr_str = str(addr)
 
-    #check if has record in DB
+        #reverse dns lookup oneliner
+#        domain_name = socket.gethostbyaddr(addr_str)[0]
 
-    #reverse dns lookup oneliner
-#   socket.gethostbyaddr(addr_str)[0]
-    #((record exists && time to revisit) || norecord )? continue : next IP
+        #send request
+        req = requests.get(f"http://{addr_str}")
+        bs = BeautifulSoup(req.text,"lxml")
+        print(bs.text)
+    except:
+        #should anything at all go wrong - scrap attempt and continue from start ad infinitum
+        print(sys.exc_info())
+        continue
+
