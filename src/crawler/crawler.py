@@ -15,12 +15,14 @@ while True:
         addr_str = str(addr)
 
         #reverse dns lookup oneliner
-#        domain_name = socket.gethostbyaddr(addr_str)[0]
 
         #send request
-        req = requests.get(f"http://{addr_str}")
+        req = requests.get(f"http://{addr_str}", timeout=1)
         bs = BeautifulSoup(req.text,"lxml")
         print(bs.text)
+        domain_name = socket.gethostbyaddr(addr_str)[0]
+        print(domain_name)
+        break
     except:
         #should anything at all go wrong - scrap attempt and continue from start ad infinitum
         print(sys.exc_info())
