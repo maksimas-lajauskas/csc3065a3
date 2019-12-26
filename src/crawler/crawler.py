@@ -17,7 +17,7 @@ while True:
         #reverse dns lookup oneliner
 
         #send request
-        req = requests.get(f"http://{addr_str}", timeout=1)
+        req = requests.get(f"http://{addr_str}", timeout=5)
         bs = BeautifulSoup(req.text,"lxml")
         print(bs.text)
         domain_name = socket.gethostbyaddr(addr_str)[0]
