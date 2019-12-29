@@ -1,16 +1,16 @@
 //Configure Google Cloud Platform
 
 provider "google"{
-  credentials = "${file("csc3065a3-f1d531a5dd9a.json")}"
-  project = "csc3065a3"
-  region = "us-west1"
+  credentials = file(var.gcp_key_json)
+  project = var.gcp_proj_id
+  region = var.gcp_region
 }
 
 provider "kubernetes" {}
 
 resource "google_container_cluster" "primary" {
-    name = "csc3065a3-cluster"
-    location = "us-west1"
+    name = "${var.gcp_proj_id}-cluster"
+    location = var.gcp_region
     remove_default_node_pool = true
     initial_node_count = 1
     ip_allocation_policy {}
@@ -24,10 +24,10 @@ resource "google_container_cluster" "primary" {
     }
 }
 
-resource "google_container_node_pool" "primary_preemptible_nodes" {
-    name = "csc3065a3-pool"
-    location = "us-west1"
-    cluster = "csc3065a3-cluster"
+resource "google_container_node_pool" "primary_node_pool" {
+    name = "${var.gcp_proj_id}-pool"
+    location = var.gcp_region
+    cluster = "cs-cluster"
     node_count = 0
 
     autoscaling {
