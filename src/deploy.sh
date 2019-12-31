@@ -1,8 +1,5 @@
 #!/bin/bash
 
-#extracts service account email from keys json: grep -Po [[:alnum:]-_]+@.+\.gserviceaccount\.com [KEYS JSON FILE]
-##!!! -> can push `docker tag`'ed images using `gcloud docker -- push [tag]`, will whine but will work first try, still deploying to test running images deployed this way"
-
 deployment_id(){
 echo "$(date +%d)_$(date +%m)_$(date +%Y)_$(date +%H)_$(date +%M)_$(date +%S)"
 }
@@ -16,8 +13,9 @@ tfpath=""
 #vars - gcp
 gcp_proj_id=""
 gcp_region=""
-gcp_key_json="
+gcp_key_json=""
 gcp_service_account=""
+gcp_service_account_email=""
 gcp_bigtable_instance="qse-bigtable"
 gcp_bigtable_index_table="qse-index"
 gcp_bigtable_ads_table="qse-ads"
@@ -34,7 +32,7 @@ while (( "$#" )); do
             echo "- have an existing projet on GCP"
             echo "- have an existing service account or use ' gcloud iam service-accounts create [SA-NAME] --description \"[SA-DESCRIPTION]\" --display-name \"[SA-DISPLAY-NAME]\" ' to create"
             echo "- have a valid service key json file or visit 'https://console.cloud.google.com/apis/credentials/serviceaccountkey' to create"
-            echo "(service account must have sufficient privileges, e.g. roles/owner and roles/storage.objectViewer)"
+            echo "[service account must have sufficient privileges, e.g. roles/owner and roles/storage.objectViewer]"
             echo "usage: './deploy.sh --provider gcp --project-id [project id] --region [project region] --creds-file [credentials json]'"
             echo "up to date region list can be found here: 'https://cloud.google.com/compute/docs/regions-zones/'"
             #aws deployment
@@ -130,6 +128,17 @@ then
 
     fi
 
+    if [[ "$gcp_service_account" = "" ]]
+    then
+        gcp_service_account_email=$(grep -Po [[:alnum:]-_]+@.+\.gserviceaccount\.com "$gcp_key_json")
+        echo "set service account email to: $gcp_service_account_email"
+        gcp_service_account=$(echo "$gcp_service_account_email" | grep -Po [[:alnum:]-_]+@ | grep -Po [[:alnum:]-_]+)
+        echo "set service account to: $gcp_service_account"
+    fi
+
+    cp "$gcp_key_json" "$(pwd)/keys"
+    gcp_key_json="$(pwd)/keys"
+
     #api's enabled?
     if [[ $(gcloud services list --enabled | grep -c "container.googleapis.com") -eq 0 ]]
     then
@@ -154,23 +163,19 @@ then
             #build images
 
                 #setup docker
-                cat "$key_name" | docker login -u _json_key --password-stdin gcr.io/"$gcp_proj_id"
+                cat "$gcp_key_json" | docker login -u _json_key --password-stdin gcr.io/"$gcp_proj_id"
 
                 #crawler
                 cd $(pwd)/crawler/GCP
                 cp "$gcp_key_json" ./gcp_keys.json
                 crawlerID="crawler-gcp-$(deployment_id)"
-                docker build -t="$carwlerID" .
+                docker build -t="$crawlerID" .
                 cd "$src_dir"
 
                 crawler_gcr_tag="gcr.io/$gcp_proj_id/$crawlerID:latest"
                 docker tag "$crawlerID" "$crawler_gcr_tag"
                 crawler_digest=$(gcloud docker -- push "$crawler_gcr_tag")
                 echo "CRAWLER_DIGEST VARIABLE CONTENTS: $crawler_digest" #for testing
-
-                #after pushing images, grant service account permissions to pull from gcr
-                gsutil iam ch serviceAccount:"$gcp_service_account"@"$gcp_proj_id".iam.gserviceaccount.com:objectViewer gs://artifacts."$gcp_proj_id".appspot.com
-
 
         #write project name variable
         echo "variable \"gcp_proj_id\"{" > "$tfpath/$varfile" #clobbers tfvars on redeploy
@@ -207,6 +212,8 @@ then
         echo -e "\tdefault = \"$gcp_bigtable_ads_table\"" >> "$tfpath/$varfile"
         echo "}" >> "$tfpath/$varfile"
 
+        #clear kubernetes pods
+        echo "" > pods.tf
 
         #setup almost done, initialise terraform in $tfpath and create cluster (will fail on pod creation at this point if not split up)
         cd "$tfpath" && terraform init
@@ -218,30 +225,26 @@ then
 
         #write out pod resources now, todo...
 
-        #clear kubernetes pods from main.tf
-        first_kubernetes_pod_mention=$(grep -n "kubernetes_pod" main.tf | grep -Po [[:digit:]]+\: | grep -Po [[:digit:]]+ | head -n1)
-        cutoff_line_no=$(( $first_kubernetes_pod_mention - 1 ))
-        head -n$cutoff_line_no main.tf > main.tf
+            #write out test pod [0c7dbb8923de6ecd40ffb4de9c5969201fa85663bbee4a5052bd6cb491a05ef7 should be $test_digest]
+            echo "resource \"kubernetes_pod\" \"pytest-cca3\" {" >> pods.tf
+            echo "    metadata {" >> pods.tf
+            echo "        name = \"pytest-cca3\"" >> pods.tf
+            echo "        labels = {" >> pods.tf
+            echo "            App = \"pytest-cca3\"" >> pods.tf
+            echo "        }" >> pods.tf
+            echo "    }" >> pods.tf
+            echo "    spec {" >> pods.tf
+            echo "        container {" >> pods.tf
+            echo "            image = \"gcr.io/cca3-263512/pytest-cca3@sha256:0c7dbb8923de6ecd40ffb4de9c5969201fa85663bbee4a5052bd6cb491a05ef7\"" >> pods.tf #TODO dynamically retrieve digest sha256 code
+            echo "            name  = \"pytest-cca3\"" >> pods.tf
+            echo "            port {" >> pods.tf
+            echo "                container_port = 80" >> pods.tf
+            echo "            }" >> pods.tf
+            echo "        }" >> pods.tf
+            echo "    }" >> pods.tf
+            echo "}" >> pods.tf
 
-        #write out test pod [0c7dbb8923de6ecd40ffb4de9c5969201fa85663bbee4a5052bd6cb491a05ef7 should be $test_digest]
-        echo "resource \"kubernetes_pod\" \"pytest-cca3\" {" >> main.tf
-        echo "    metadata {" >> main.tf
-        echo "        name = \"pytest-cca3\"" >> main.tf
-        echo "        labels = {" >> main.tf
-        echo "            App = \"pytest-cca3\"" >> main.tf
-        echo "        }" >> main.tf
-        echo "    }" >> main.tf
-        echo "    spec {" >> main.tf
-        echo "        container {" >> main.tf
-        echo "            image = \"gcr.io/cca3-263512/pytest-cca3@sha256:0c7dbb8923de6ecd40ffb4de9c5969201fa85663bbee4a5052bd6cb491a05ef7\"" >> main.tf #TODO dynamically retrieve digest sha256 code
-        echo "            name  = \"pytest-cca3\"" >> main.tf
-        echo "            port {" >> main.tf
-        echo "                container_port = 80" >> main.tf
-        echo "            }" >> main.tf
-        echo "        }" >> main.tf
-        echo "    }" >> main.tf
-        echo "}" >> main.tf
-
+        gsutil iam ch serviceAccount:"$gcp_service_account@$gcp_proj_id.iam.gserviceaccount.com:objectViewer" "gs://artifacts.$gcp_proj_id.appspot.com"
 
         plan="qsedeployplan_$(deployment_id).out"
         terraform plan -out="$plan" && terraform apply "$plan"

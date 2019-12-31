@@ -82,24 +82,3 @@ resource "google_bigtable_table" "qse-ads" {
   instance_name = google_bigtable_instance.qse-bigtable.name
 }
 
-
-resource "kubernetes_pod" "pytest-cca3" {
-    metadata {
-        name = "pytest-cca3"
-        labels = {
-            App = "pytest-cca3"
-        }
-    }
-
-    spec {
-        container {
-            image = "gcr.io/cca3-263512/pytest-cca3@sha256:0c7dbb8923de6ecd40ffb4de9c5969201fa85663bbee4a5052bd6cb491a05ef7"
-            name  = "pytest-cca3"
-
-            port {
-                container_port = 80
-            }
-        }
-    }
-}
-
