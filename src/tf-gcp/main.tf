@@ -10,7 +10,7 @@ provider "kubernetes" {}
 
 resource "google_container_cluster" "primary" {
     name = "${var.gcp_proj_id}-cluster"
-    location = var.gcp_region
+    location = "${var.gcp_zone}"
     remove_default_node_pool = true
     initial_node_count = 1
     ip_allocation_policy {}
@@ -26,9 +26,9 @@ resource "google_container_cluster" "primary" {
 
 resource "google_container_node_pool" "primary_node_pool" {
     name = "${var.gcp_proj_id}-pool"
-    location = var.gcp_region
-    cluster = "cs-cluster"
-    node_count = 0
+    location = "${var.gcp_zone}"
+    cluster = google_container_cluster.primary.name
+    node_count = 1
 
     autoscaling {
         min_node_count= 0
@@ -46,7 +46,8 @@ resource "google_container_node_pool" "primary_node_pool" {
 
         oauth_scopes = [
         "https://www.googleapis.com/auth/logging.write",
-        "https://www.googleapis.com/auth/monitoring"
+        "https://www.googleapis.com/auth/monitoring",
+        "https://www.googleapis.com/auth/devstorage.read_only"
         ]
     }
 
@@ -54,20 +55,46 @@ resource "google_container_node_pool" "primary_node_pool" {
         create = "30m"
         update = "40m"
     }
+
 }
 
-resource "kubernetes_pod" "nginx" {
+resource "google_bigtable_instance" "qse-bigtable" {
+  name = var.gcp_bigtable_instance
+  project =  var.gcp_proj_id
+
+  cluster {
+    cluster_id   = "${var.gcp_proj_id}-cluster"
+    zone         = var.gcp_zone
+    num_nodes    = 3
+    storage_type = "HDD"
+  }
+}
+
+resource "google_bigtable_table" "qse-index" {
+  name = var.gcp_bigtable_index_table
+  project =  var.gcp_proj_id
+  instance_name = google_bigtable_instance.qse-bigtable.name
+}
+
+resource "google_bigtable_table" "qse-ads" {
+  name = var.gcp_bigtable_ads_table
+  project =  var.gcp_proj_id
+  instance_name = google_bigtable_instance.qse-bigtable.name
+}
+
+
+resource "kubernetes_pod" "pytest-cca3" {
     metadata {
-        name = "nginx-example"
+        name = "pytest-cca3"
         labels = {
-            App = "nginx"
+            App = "pytest-cca3"
         }
     }
 
     spec {
         container {
-            image = "nginx:1.7.8"
-            name  = "example"
+            image = "gcr.io/cca3-263512/pytest-cca3@sha256:0c7dbb8923de6ecd40ffb4de9c5969201fa85663bbee4a5052bd6cb491a05ef7"
+            name  = "pytest-cca3"
 
             port {
                 container_port = 80
@@ -75,3 +102,4 @@ resource "kubernetes_pod" "nginx" {
         }
     }
 }
+
