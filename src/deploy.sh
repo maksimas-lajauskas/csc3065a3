@@ -1,7 +1,7 @@
 #!/bin/bash
 
 deployment_id(){
-echo "$(date +%d)_$(date +%m)_$(date +%Y)_$(date +%H)_$(date +%M)_$(date +%S)"
+echo "$(date +%d)-$(date +%m)-$(date +%Y)-$(date +%H)-$(date +%M)-$(date +%S)"
 }
 ############### start vars and config capture
 
@@ -172,10 +172,10 @@ then
                 docker build -t="$crawlerID" .
                 cd "$src_dir"
 
-                crawler_gcr_tag="gcr.io/$gcp_proj_id/$crawlerID:latest"
-                docker tag "$crawlerID" "$crawler_gcr_tag"
-                crawler_digest=$(gcloud docker -- push "$crawler_gcr_tag")
-                echo "CRAWLER_DIGEST VARIABLE CONTENTS: $crawler_digest" #for testing
+                crawler_gcr_tag="gcr.io/$gcp_proj_id/$crawlerID"
+                docker tag "$crawlerID" "$crawler_gcr_tag:latest"
+                gcloud docker -- push "$crawler_gcr_tag:latest"
+                crawler_sha=$(docker images --digests| grep "$crawler_gcr_tag" | grep -Po "sha256.[[:alnum:]]+")
 
         #write project name variable
         echo "variable \"gcp_proj_id\"{" > "$tfpath/$varfile" #clobbers tfvars on redeploy
@@ -212,31 +212,32 @@ then
         echo -e "\tdefault = \"$gcp_bigtable_ads_table\"" >> "$tfpath/$varfile"
         echo "}" >> "$tfpath/$varfile"
 
-        #clear kubernetes pods
-        echo "" > pods.tf
 
         #setup almost done, initialise terraform in $tfpath and create cluster (will fail on pod creation at this point if not split up)
         cd "$tfpath" && terraform init
-        plan="qsedeployplan_$(deployment_id).out"
-        terraform plan -out="$plan" && terraform apply "$plan"
+
+        #clear old kubernetes pod definitions
+        echo "" > pods.tf
+#        plan="qsedeployplan_$(deployment_id).out"
+#        terraform plan -out="$plan" && terraform apply "$plan"
 
         #configure kubectl and run plan + apply again to deploy workload
-        gcloud container clusters get-credentials "$gcp_proj_id-cluster" --region "$gcp_region-a" --project "$gcp_proj_id"
+#        gcloud container clusters get-credentials "$gcp_proj_id-cluster" --region "$gcp_region-a" --project "$gcp_proj_id"
 
         #write out pod resources now, todo...
 
             #write out test pod [0c7dbb8923de6ecd40ffb4de9c5969201fa85663bbee4a5052bd6cb491a05ef7 should be $test_digest]
-            echo "resource \"kubernetes_pod\" \"pytest-cca3\" {" >> pods.tf
+            echo "resource \"kubernetes_pod\" \"$crawlerID\" {" >> pods.tf
             echo "    metadata {" >> pods.tf
-            echo "        name = \"pytest-cca3\"" >> pods.tf
+            echo "        name = \"$crawlerID\"" >> pods.tf
             echo "        labels = {" >> pods.tf
-            echo "            App = \"pytest-cca3\"" >> pods.tf
+            echo "            App = \"$crawlerID\"" >> pods.tf
             echo "        }" >> pods.tf
             echo "    }" >> pods.tf
             echo "    spec {" >> pods.tf
             echo "        container {" >> pods.tf
-            echo "            image = \"gcr.io/cca3-263512/pytest-cca3@sha256:0c7dbb8923de6ecd40ffb4de9c5969201fa85663bbee4a5052bd6cb491a05ef7\"" >> pods.tf #TODO dynamically retrieve digest sha256 code
-            echo "            name  = \"pytest-cca3\"" >> pods.tf
+            echo "            image = \"$crawler_gcr_tag@$crawler_sha\"" >> pods.tf
+            echo "            name  = \"$crawlerID\"" >> pods.tf
             echo "            port {" >> pods.tf
             echo "                container_port = 80" >> pods.tf
             echo "            }" >> pods.tf
