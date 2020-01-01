@@ -218,11 +218,9 @@ then
 
         #clear old kubernetes pod definitions
         echo "" > pods.tf
-#        plan="qsedeployplan_$(deployment_id).out"
-#        terraform plan -out="$plan" && terraform apply "$plan"
 
-        #configure kubectl and run plan + apply again to deploy workload
-#        gcloud container clusters get-credentials "$gcp_proj_id-cluster" --region "$gcp_region-a" --project "$gcp_proj_id"
+        #configure kubectl and run plan + apply again to deploy workload (appears to be a dependency for terraform to deploy k8s pods)
+        gcloud container clusters get-credentials "$gcp_proj_id-cluster" --region "$gcp_region-a" --project "$gcp_proj_id"
 
         #write out pod resources now, todo...
 

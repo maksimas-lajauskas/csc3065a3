@@ -74,11 +74,17 @@ resource "google_bigtable_table" "qse-index" {
   name = var.gcp_bigtable_index_table
   project =  var.gcp_proj_id
   instance_name = google_bigtable_instance.qse-bigtable.name
+  column_family {
+    family = "index"
+  }
 }
 
 resource "google_bigtable_table" "qse-ads" {
   name = var.gcp_bigtable_ads_table
   project =  var.gcp_proj_id
   instance_name = google_bigtable_instance.qse-bigtable.name
+  column_family {
+    family = "ads"
+  }
 }
 
