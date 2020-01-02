@@ -1,7 +1,6 @@
 FROM debian
 COPY ./gcp_keys.json /keys.json
-ENV GOOGLE_APPLICATION_CREDENTIALS "/keys.json"
-ENV QSEPROVIDER "GCP"
+COPY ./crawler.py /crawler.py
 RUN apt-get update \
     && apt-get install -y python3 python3-pip \
     && pip3 install requests bs4 google-cloud-bigtable

@@ -10,6 +10,7 @@ echo "$(date +%d)-$(date +%m)-$(date +%Y)-$(date +%H)-$(date +%M)-$(date +%S)"
 provider=""
 varfile="deploymentvars.tf"
 tfpath=""
+common_page_content_column_name="pagetext"
 
 #vars - gcp
 gcp_proj_id=""
@@ -20,6 +21,7 @@ gcp_service_account_email=""
 gcp_bigtable_instance="qse-bigtable"
 gcp_bigtable_index_table="qse-index"
 gcp_bigtable_ads_table="qse-ads"
+gcp_bigtable_column_family="index"
 declare -a gcp_zones
 declare -a gcp_zones_final
 
@@ -193,6 +195,7 @@ then
                 #crawler
                 echo "building crawler with provided keys..."
                 cd $(pwd)/crawler/GCP
+                cp ../crawler.py ./crawler.py
                 cp "$gcp_key_json" ./gcp_keys.json
                 crawlerID="crawler-gcp-$(deployment_id)"
                 docker build -t="$crawlerID" .
@@ -295,6 +298,36 @@ then
             echo "        container {" >> pods.tf
             echo "            image = \"$crawler_gcr_tag@$crawler_sha\"" >> pods.tf
             echo "            name  = \"$crawlerID\"" >> pods.tf
+            #environment variables
+            echo "            env {" >> pods.tf
+            echo "                  name = \"QSEPROVIDER\"" >> pods.tf
+            echo "                  value = \"GCP\"" >> pods.tf
+            echo "            }" >> pods.tf
+            echo "            env {" >> pods.tf
+            echo "                  name = \"GCP_PROJECT_ID\"" >> pods.tf
+            echo "                  value = \"$gcp_proj_id\"" >> pods.tf
+            echo "            }" >> pods.tf
+            echo "            env {" >> pods.tf
+            echo "                  name = \"GOOGLE_APPLICATION_CREDENTIALS\"" >> pods.tf
+            echo "                  value = \"/keys.json\"" >> pods.tf
+            echo "            }" >> pods.tf
+            echo "            env {" >> pods.tf
+            echo "                  name = \"GCP_BIGTABLE_INSTANCE\"" >> pods.tf
+            echo "                  value = \"$gcp_bigtable_instance\"" >> pods.tf
+            echo "            }" >> pods.tf
+            echo "            env {" >> pods.tf
+            echo "                  name = \"GCP_BIGTABLE_INDEX_TABLE\"" >> pods.tf
+            echo "                  value = \"$gcp_bigtable_index_table\"" >> pods.tf
+            echo "            }" >> pods.tf
+            echo "            env {" >> pods.tf
+            echo "                  name = \"GCP_BIGTABLE_COLUMN_FAMILY\"" >> pods.tf
+            echo "                  value = \"$gcp_bigtable_column_family\"" >> pods.tf
+            echo "            }" >> pods.tf
+            echo "            env {" >> pods.tf
+            echo "                  name = \"COMMON_PAGE_CONTENT_COLUMN_NAME\"" >> pods.tf
+            echo "                  value = \"$common_page_content_column_name\"" >> pods.tf
+            echo "            }" >> pods.tf
+            #end env vars
             echo "            port {" >> pods.tf
             echo "                container_port = 80" >> pods.tf
             echo "            }" >> pods.tf
