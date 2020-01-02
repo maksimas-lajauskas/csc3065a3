@@ -10,7 +10,7 @@ provider "kubernetes" {}
 
 resource "google_container_cluster" "primary" {
     name = "${var.gcp_proj_id}-cluster"
-    location = "${var.gcp_zone}"
+    location = var.gcp_region
     remove_default_node_pool = true
     initial_node_count = 1
     ip_allocation_policy {}
@@ -26,7 +26,7 @@ resource "google_container_cluster" "primary" {
 
 resource "google_container_node_pool" "primary_node_pool" {
     name = "${var.gcp_proj_id}-pool"
-    location = "${var.gcp_zone}"
+    location = var.gcp_region
     cluster = google_container_cluster.primary.name
     node_count = 1
 
@@ -61,10 +61,9 @@ resource "google_container_node_pool" "primary_node_pool" {
 resource "google_bigtable_instance" "qse-bigtable" {
   name = var.gcp_bigtable_instance
   project =  var.gcp_proj_id
-
   cluster {
-    cluster_id   = "${var.gcp_proj_id}-cluster"
-    zone         = var.gcp_zone
+    cluster_id   = "${var.gcp_proj_id}-btc-${var.gcp_zones[0]}"
+    zone         = var.gcp_zones[0]
     num_nodes    = 3
     storage_type = "HDD"
   }
