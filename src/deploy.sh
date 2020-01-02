@@ -204,6 +204,14 @@ then
                 gcloud docker -- push "$crawler_gcr_tag:latest"
                 crawler_sha=$(docker images --digests| grep "$crawler_gcr_tag" | grep -Po "sha256.[[:alnum:]]+")
 
+        echo "clearing additional bigtable clusters..."
+        first_existing_zone=$(grep -n1 "default = \[" tf-gcp/deploymentvars.tf | egrep -v "variable \"gcp_zones\"{|default = \[" | grep -Po "([-[:alnum:]])+" | tail -n1)
+        cleardown_list=($(gcloud bigtable clusters list | egrep -v "$first_existing_zone" | grep -Po "$gcp_proj_id-btc-[[:alnum:]-]+"))
+
+        for cluster in "${cleardown_list[@]}"; do
+            gcloud bigtable clusters delete "$cluster" --instance "$gcp_bigtable_instance" --quiet
+        done
+
         echo "writing terraform variables file..."
         #write project name variable
         echo "variable \"gcp_proj_id\"{" > "$tfpath/$varfile" #clobbers varfile on redeploy

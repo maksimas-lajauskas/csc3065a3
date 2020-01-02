@@ -34,3 +34,4 @@ for i in range(1,len(test_query_string_tokenised)):
 
 if sum(matchscore) != len(matchscore):
 	#skip to next
+#search using filters...
