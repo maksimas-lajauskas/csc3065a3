@@ -10,6 +10,8 @@ echo "$(date +%d)-$(date +%m)-$(date +%Y)-$(date +%H)-$(date +%M)-$(date +%S)"
 provider=""
 num_crawlers=""
 default_num_crawlers=1
+num_search_pods=""
+default_num_search_pods=1
 varfile="deploymentvars.tf"
 tfpath=""
 common_page_content_column_name="pagetext"
@@ -91,6 +93,10 @@ while (( "$#" )); do
 
         "--num-crawlers")
             num_crawlers="$2"
+            ;;
+
+        "--num-search-pods")
+            num_search_pods="$2"
             ;;
 
         *)
@@ -213,6 +219,21 @@ then
                 gcloud docker -- push "$crawler_gcr_tag:latest"
                 crawler_sha=$(docker images --digests| grep "$crawler_gcr_tag" | grep -Po "sha256.[[:alnum:]]+")
 
+                #search
+                echo "building search pod image with provided keys..."
+                cd $(pwd)/search/GCP
+                cp ../search.py ./search.py
+                cp "$gcp_key_json" ./gcp_keys.json
+                searchID="search-gcp-$(deployment_id)"
+                docker build -t="$searchID" .
+                cd "$src_dir"
+
+                echo "tagging and pushing search pod image to project repository..."
+                search_gcr_tag="gcr.io/$gcp_proj_id/$searchID"
+                docker tag "$searchID" "$search_gcr_tag:latest"
+                gcloud docker -- push "$search_gcr_tag:latest"
+                search_sha=$(docker images --digests| grep "$search_gcr_tag" | grep -Po "sha256.[[:alnum:]]+")
+
         echo "clearing additional bigtable clusters..."
         first_existing_zone=$(grep -n1 "default = \[" tf-gcp/deploymentvars.tf | egrep -v "variable \"gcp_zones\"{|default = \[" | grep -Po "([-[:alnum:]])+" | tail -n1)
         cleardown_list=($(gcloud bigtable clusters list | egrep -v "$first_existing_zone" | grep -Po "$gcp_proj_id-btc-[[:alnum:]-]+"))
@@ -281,6 +302,7 @@ then
 
         #clear old kubernetes pod definitions
         echo "" > pods.tf
+        echo "" > services.tf
 
         echo "attempting initial terraform apply to create cluster, no pods will be deployed this round"
         plan="qsedeployplan_$(deployment_id).out"
@@ -375,6 +397,116 @@ then
             echo "        }" >> pods.tf
             echo "    }" >> pods.tf
             echo "}" >> pods.tf
+
+            #SEARCH
+                #revert to default value
+                if [[ "$num_search_pods" = "" ]]
+                then
+                    num_search_pods="$default_num_search_pods"
+                fi
+            echo "resource \"kubernetes_deployment\" \"$searchID\" {" >> pods.tf
+            echo "    metadata {" >> pods.tf
+            echo "        name = \"$searchID\"" >> pods.tf
+            echo "        labels = {" >> pods.tf
+            echo "            App = \"$searchID\"" >> pods.tf
+            echo "        }" >> pods.tf
+            echo "    }" >> pods.tf
+            echo "    spec {" >> pods.tf
+            echo "        replicas = $num_search_pods" >> pods.tf
+            echo "        strategy {" >> pods.tf
+            echo "            type = \"RollingUpdate\"" >> pods.tf
+            echo "            rolling_update {" >> pods.tf
+            echo "                max_surge = $(( $num_search_pods + 1 ))" >> pods.tf
+            echo "                max_unavailable = $num_search_pods" >> pods.tf
+            echo "            }" >> pods.tf
+            echo "        }" >> pods.tf
+            echo "        selector {" >> pods.tf
+            echo "            match_labels = {" >> pods.tf
+            echo "                App = \"$searchID\"" >> pods.tf
+            echo "            }" >> pods.tf
+            echo "        }" >> pods.tf
+            echo "        template {" >> pods.tf
+            echo "            metadata{" >> pods.tf
+            echo "                labels = {" >> pods.tf
+            echo "                    App = \"$searchID\"" >> pods.tf
+            echo "                }" >> pods.tf
+            echo "            }" >> pods.tf
+            echo "            spec {" >> pods.tf
+            echo "                container {" >> pods.tf
+            echo "                    image = \"$search_gcr_tag@$search_sha\"" >> pods.tf
+            echo "                    name  = \"$searchID\"" >> pods.tf
+            echo "                    resources {" >> pods.tf
+            echo "                                limits {" >> pods.tf
+            echo "                                  cpu    = \"0.5\"" >> pods.tf
+            echo "                                  memory = \"256Mi\"" >> pods.tf
+            echo "                                }" >> pods.tf
+            echo "                                requests {" >> pods.tf
+            echo "                                  cpu    = \"250m\"" >> pods.tf
+            echo "                                  memory = \"50Mi\"" >> pods.tf
+            echo "                                }" >> pods.tf
+            echo "                    }" >> pods.tf
+            echo "                    env {" >> pods.tf
+            echo "                          name = \"QSEPROVIDER\"" >> pods.tf
+            echo "                          value = \"GCP\"" >> pods.tf
+            echo "                    }" >> pods.tf
+            echo "                    env {" >> pods.tf
+            echo "                          name = \"GCP_PROJECT_ID\"" >> pods.tf
+            echo "                          value = \"$gcp_proj_id\"" >> pods.tf
+            echo "                    }" >> pods.tf
+            echo "                    env {" >> pods.tf
+            echo "                          name = \"GCP_ADS_SERVICE\"" >> pods.tf
+            echo "                          value = \"NONE\"" >> pods.tf
+            echo "                    }" >> pods.tf
+            echo "                    env {" >> pods.tf
+            echo "                          name = \"GOOGLE_APPLICATION_CREDENTIALS\"" >> pods.tf
+            echo "                          value = \"/keys.json\"" >> pods.tf
+            echo "                    }" >> pods.tf
+            echo "                    env {" >> pods.tf
+            echo "                          name = \"GCP_BIGTABLE_INSTANCE\"" >> pods.tf
+            echo "                          value = \"$gcp_bigtable_instance\"" >> pods.tf
+            echo "                    }" >> pods.tf
+            echo "                    env {" >> pods.tf
+            echo "                          name = \"GCP_BIGTABLE_INDEX_TABLE\"" >> pods.tf
+            echo "                          value = \"$gcp_bigtable_index_table\"" >> pods.tf
+            echo "                    }" >> pods.tf
+            echo "                    env {" >> pods.tf
+            echo "                          name = \"GCP_BIGTABLE_COLUMN_FAMILY\"" >> pods.tf
+            echo "                          value = \"$gcp_bigtable_column_family\"" >> pods.tf
+            echo "                    }" >> pods.tf
+            echo "                    env {" >> pods.tf
+            echo "                          name = \"COMMON_PAGE_CONTENT_COLUMN_NAME\"" >> pods.tf
+            echo "                          value = \"$common_page_content_column_name\"" >> pods.tf
+            echo "                    }" >> pods.tf
+            echo "                    port {" >> pods.tf
+            echo "                        container_port = 80" >> pods.tf
+            echo "                    }" >> pods.tf
+            echo "                }" >> pods.tf
+            echo "            }" >> pods.tf
+            echo "        }" >> pods.tf
+            echo "    }" >> pods.tf
+            echo "}" >> pods.tf
+
+            #registering LB for search
+            echo "resource "kubernetes_service" "search_service" {" > services.tf
+            echo "  metadata {" >> services.tf
+            echo "    name = \"search-service\"" >> services.tf
+            echo "  }" >> services.tf
+            echo "  spec {" >> services.tf
+            echo "    selector = {" >> services.tf
+            echo "      App = kubernetes_deployment.$searchID.spec.0.template.0.metadata[0].labels.App" >> services.tf
+            echo "    }" >> services.tf
+            echo "    port {" >> services.tf
+            echo "      port        = 80" >> services.tf
+            echo "      target_port = 80" >> services.tf
+            echo "    }" >> services.tf
+            echo "    type = \"LoadBalancer\"" >> services.tf
+            echo "  }" >> services.tf
+            echo "}" >> services.tf
+
+            echo "output \"lb_ip\" {" >> services.tf
+            echo "value = kubernetes_service.search_service.load_balancer_ingress[0]" >> services.tf
+            echo "}" >> services.tf
+
 
 
         echo "updating service account permissions to deploy from project's container image repository"
