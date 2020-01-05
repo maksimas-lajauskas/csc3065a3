@@ -42,7 +42,7 @@ resource "google_container_node_pool" "primary_node_pool" {
 
     node_config {
         preemptible = false
-        machine_type = "n1-standard-1"
+        machine_type = "g1-small"
 
         oauth_scopes = [
         "https://www.googleapis.com/auth/logging.write",

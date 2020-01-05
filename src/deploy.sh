@@ -12,9 +12,18 @@ num_crawlers=""
 default_num_crawlers=1
 num_search_pods=""
 default_num_search_pods=1
+num_ads_pods=""
+default_num_ads_pods=1
 varfile="deploymentvars.tf"
 tfpath=""
 common_page_content_column_name="pagetext"
+common_max_ads_per_page="3"
+common_image_file_persist_seconds="30"
+common_ads_image_column_name="imgbytes"
+common_ads_image_height_column_name="imgheight"
+common_ads_image_width_column_name="imgwidth"
+common_ads_image_mode_column_name="imgmode"
+common_ads_keywords_list_column_name="adkeywords"
 
 #vars - gcp
 gcp_proj_id=""
@@ -25,7 +34,8 @@ gcp_service_account_email=""
 gcp_bigtable_instance="qse-bigtable"
 gcp_bigtable_index_table="qse-index"
 gcp_bigtable_ads_table="qse-ads"
-gcp_bigtable_column_family="index"
+gcp_bigtable_column_family="index" #do not change without also modifying gcp main.tf
+gcp_bigtable_ads_column_family="ads" #do not change without also modifying gcp main.tf
 declare -a gcp_zones
 declare -a gcp_zones_final
 
@@ -97,6 +107,10 @@ while (( "$#" )); do
 
         "--num-search-pods")
             num_search_pods="$2"
+            ;;
+
+        "--num-ads-pods")
+            num_ads_pods="$2"
             ;;
 
         *)
@@ -233,6 +247,21 @@ then
                 docker tag "$searchID" "$search_gcr_tag:latest"
                 gcloud docker -- push "$search_gcr_tag:latest"
                 search_sha=$(docker images --digests| grep "$search_gcr_tag" | grep -Po "sha256.[[:alnum:]]+")
+
+                #ads
+                echo "building ads pod image with provided keys..."
+                cd $(pwd)/ads/GCP
+                cp ../ads.py ./ads.py
+                cp "$gcp_key_json" ./gcp_keys.json
+                adsID="ads-gcp-$(deployment_id)"
+                docker build -t="$adsID" .
+                cd "$src_dir"
+
+                echo "tagging and pushing ads pod image to project repository..."
+                ads_gcr_tag="gcr.io/$gcp_proj_id/$adsID"
+                docker tag "$adsID" "$ads_gcr_tag:latest"
+                gcloud docker -- push "$ads_gcr_tag:latest"
+                ads_sha=$(docker images --digests| grep "$ads_gcr_tag" | grep -Po "sha256.[[:alnum:]]+")
 
         echo "clearing additional bigtable clusters..."
         first_existing_zone=$(grep -n1 "default = \[" tf-gcp/deploymentvars.tf | egrep -v "variable \"gcp_zones\"{|default = \[" | grep -Po "([-[:alnum:]])+" | tail -n1)
@@ -454,10 +483,6 @@ then
             echo "                          value = \"$gcp_proj_id\"" >> pods.tf
             echo "                    }" >> pods.tf
             echo "                    env {" >> pods.tf
-            echo "                          name = \"GCP_ADS_SERVICE\"" >> pods.tf
-            echo "                          value = \"NONE\"" >> pods.tf
-            echo "                    }" >> pods.tf
-            echo "                    env {" >> pods.tf
             echo "                          name = \"GOOGLE_APPLICATION_CREDENTIALS\"" >> pods.tf
             echo "                          value = \"/keys.json\"" >> pods.tf
             echo "                    }" >> pods.tf
@@ -476,6 +501,41 @@ then
             echo "                    env {" >> pods.tf
             echo "                          name = \"COMMON_PAGE_CONTENT_COLUMN_NAME\"" >> pods.tf
             echo "                          value = \"$common_page_content_column_name\"" >> pods.tf
+            echo "                    }" >> pods.tf
+            echo "                          name = \"GCP_BIGTABLE_ADS_TABLE\"" >> pods.tf
+            echo "                          value = \"$gcp_bigtable_ads_table\"" >> pods.tf
+            echo "                    }" >> pods.tf
+            echo "                    env {" >> pods.tf
+            echo "                          name = \"GCP_BIGTABLE_ADS_COLUMN_FAMILY\"" >> pods.tf
+            echo "                          value = \"$gcp_bigtable_ads_column_family\"" >> pods.tf
+            echo "                    }" >> pods.tf
+            echo "                    env {" >> pods.tf
+            echo "                          name = \"COMMON_ADS_KEYWORDS_LIST_COLUMN_NAME\"" >> pods.tf
+            echo "                          value = \"$common_ads_keywords_list_column_name\"" >> pods.tf
+            echo "                    }" >> pods.tf
+            echo "                    env {" >> pods.tf
+            echo "                          name = \"COMMON_ADS_IMAGE_COLUMN_NAME\"" >> pods.tf
+            echo "                          value = \"$common_ads_image_column_name\"" >> pods.tf
+            echo "                    }" >> pods.tf
+            echo "                    env {" >> pods.tf
+            echo "                          name = \"COMMON_ADS_IMAGE_HEIGHT_COLUMN_NAME\"" >> pods.tf
+            echo "                          value = \"$common_ads_image_height_column_name\"" >> pods.tf
+            echo "                    }" >> pods.tf
+            echo "                    env {" >> pods.tf
+            echo "                          name = \"COMMON_ADS_IMAGE_WIDTH_COLUMN_NAME\"" >> pods.tf
+            echo "                          value = \"$common_ads_image_width_column_name\"" >> pods.tf
+            echo "                    }" >> pods.tf
+            echo "                    env {" >> pods.tf
+            echo "                          name = \"COMMON_ADS_IMAGE_MODE_COLUMN_NAME\"" >> pods.tf
+            echo "                          value = \"$common_ads_image_column_name\"" >> pods.tf
+            echo "                    }" >> pods.tf
+            echo "                    env {" >> pods.tf
+            echo "                          name = \"COMMON_IMAGE_FILE_PERSIST_SECONDS\"" >> pods.tf
+            echo "                          value = \"$common_image_file_persist_seconds\"" >> pods.tf
+            echo "                    }" >> pods.tf
+            echo "                    env {" >> pods.tf
+            echo "                          name = \"COMMON_MAX_ADS_PER_PAGE\"" >> pods.tf
+            echo "                          value = \"$common_max_ads_per_page\"" >> pods.tf
             echo "                    }" >> pods.tf
             echo "                    port {" >> pods.tf
             echo "                        container_port = 80" >> pods.tf
@@ -507,6 +567,133 @@ then
             echo "value = kubernetes_service.search_service.load_balancer_ingress[0]" >> services.tf
             echo "}" >> services.tf
 
+            #ADS
+                #revert to default value
+                if [[ "$num_ads_pods" = "" ]]
+                then
+                    num_ads_pods="$default_num_ads_pods"
+                fi
+            echo "resource \"kubernetes_deployment\" \"$adsID\" {" >> pods.tf
+            echo "    metadata {" >> pods.tf
+            echo "        name = \"$adsID\"" >> pods.tf
+            echo "        labels = {" >> pods.tf
+            echo "            App = \"$adsID\"" >> pods.tf
+            echo "        }" >> pods.tf
+            echo "    }" >> pods.tf
+            echo "    spec {" >> pods.tf
+            echo "        replicas = $num_ads_pods" >> pods.tf
+            echo "        strategy {" >> pods.tf
+            echo "            type = \"RollingUpdate\"" >> pods.tf
+            echo "            rolling_update {" >> pods.tf
+            echo "                max_surge = $(( $num_ads_pods + 1 ))" >> pods.tf
+            echo "                max_unavailable = $num_ads_pods" >> pods.tf
+            echo "            }" >> pods.tf
+            echo "        }" >> pods.tf
+            echo "        selector {" >> pods.tf
+            echo "            match_labels = {" >> pods.tf
+            echo "                App = \"$adsID\"" >> pods.tf
+            echo "            }" >> pods.tf
+            echo "        }" >> pods.tf
+            echo "        template {" >> pods.tf
+            echo "            metadata{" >> pods.tf
+            echo "                labels = {" >> pods.tf
+            echo "                    App = \"$adsID\"" >> pods.tf
+            echo "                }" >> pods.tf
+            echo "            }" >> pods.tf
+            echo "            spec {" >> pods.tf
+            echo "                container {" >> pods.tf
+            echo "                    image = \"$ads_gcr_tag@$ads_sha\"" >> pods.tf
+            echo "                    name  = \"$adsID\"" >> pods.tf
+            echo "                    resources {" >> pods.tf
+            echo "                                limits {" >> pods.tf
+            echo "                                  cpu    = \"0.5\"" >> pods.tf
+            echo "                                  memory = \"256Mi\"" >> pods.tf
+            echo "                                }" >> pods.tf
+            echo "                                requests {" >> pods.tf
+            echo "                                  cpu    = \"250m\"" >> pods.tf
+            echo "                                  memory = \"50Mi\"" >> pods.tf
+            echo "                                }" >> pods.tf
+            echo "                    }" >> pods.tf
+            echo "                    env {" >> pods.tf
+            echo "                          name = \"QSEPROVIDER\"" >> pods.tf
+            echo "                          value = \"GCP\"" >> pods.tf
+            echo "                    }" >> pods.tf
+            echo "                    env {" >> pods.tf
+            echo "                          name = \"GCP_PROJECT_ID\"" >> pods.tf
+            echo "                          value = \"$gcp_proj_id\"" >> pods.tf
+            echo "                    }" >> pods.tf
+            echo "                    env {" >> pods.tf
+            echo "                          name = \"GOOGLE_APPLICATION_CREDENTIALS\"" >> pods.tf
+            echo "                          value = \"/keys.json\"" >> pods.tf
+            echo "                    }" >> pods.tf
+            echo "                    env {" >> pods.tf
+            echo "                          name = \"GCP_BIGTABLE_INSTANCE\"" >> pods.tf
+            echo "                          value = \"$gcp_bigtable_instance\"" >> pods.tf
+            echo "                    }" >> pods.tf
+            echo "                    env {" >> pods.tf
+            echo "                          name = \"GCP_BIGTABLE_ADS_TABLE\"" >> pods.tf
+            echo "                          value = \"$gcp_bigtable_ads_table\"" >> pods.tf
+            echo "                    }" >> pods.tf
+            echo "                    env {" >> pods.tf
+            echo "                          name = \"GCP_BIGTABLE_ADS_COLUMN_FAMILY\"" >> pods.tf
+            echo "                          value = \"$gcp_bigtable_ads_column_family\"" >> pods.tf
+            echo "                    }" >> pods.tf
+            echo "                    env {" >> pods.tf
+            echo "                          name = \"COMMON_ADS_KEYWORDS_LIST_COLUMN_NAME\"" >> pods.tf
+            echo "                          value = \"$common_ads_keywords_list_column_name\"" >> pods.tf
+            echo "                    }" >> pods.tf
+            echo "                    env {" >> pods.tf
+            echo "                          name = \"COMMON_ADS_IMAGE_COLUMN_NAME\"" >> pods.tf
+            echo "                          value = \"$common_ads_image_column_name\"" >> pods.tf
+            echo "                    }" >> pods.tf
+            echo "                    env {" >> pods.tf
+            echo "                          name = \"COMMON_ADS_IMAGE_HEIGHT_COLUMN_NAME\"" >> pods.tf
+            echo "                          value = \"$common_ads_image_height_column_name\"" >> pods.tf
+            echo "                    }" >> pods.tf
+            echo "                    env {" >> pods.tf
+            echo "                          name = \"COMMON_ADS_IMAGE_WIDTH_COLUMN_NAME\"" >> pods.tf
+            echo "                          value = \"$common_ads_image_width_column_name\"" >> pods.tf
+            echo "                    }" >> pods.tf
+            echo "                    env {" >> pods.tf
+            echo "                          name = \"COMMON_ADS_IMAGE_MODE_COLUMN_NAME\"" >> pods.tf
+            echo "                          value = \"$common_ads_image_column_name\"" >> pods.tf
+            echo "                    }" >> pods.tf
+            echo "                    env {" >> pods.tf
+            echo "                          name = \"COMMON_IMAGE_FILE_PERSIST_SECONDS\"" >> pods.tf
+            echo "                          value = \"$common_image_file_persist_seconds\"" >> pods.tf
+            echo "                    }" >> pods.tf
+            echo "                    env {" >> pods.tf
+            echo "                          name = \"COMMON_MAX_ADS_PER_PAGE\"" >> pods.tf
+            echo "                          value = \"$common_max_ads_per_page\"" >> pods.tf
+            echo "                    }" >> pods.tf
+            echo "                    port {" >> pods.tf
+            echo "                        container_port = 80" >> pods.tf
+            echo "                    }" >> pods.tf
+            echo "                }" >> pods.tf
+            echo "            }" >> pods.tf
+            echo "        }" >> pods.tf
+            echo "    }" >> pods.tf
+            echo "}" >> pods.tf
+
+            #registering LB for ads
+            echo "resource "kubernetes_service" "ads_service" {" > services.tf
+            echo "  metadata {" >> services.tf
+            echo "    name = \"ads-service\"" >> services.tf
+            echo "  }" >> services.tf
+            echo "  spec {" >> services.tf
+            echo "    selector = {" >> services.tf
+            echo "      App = kubernetes_deployment.$adsID.spec.0.template.0.metadata[0].labels.App" >> services.tf
+            echo "    }" >> services.tf
+            echo "    port {" >> services.tf
+            echo "      port        = 80" >> services.tf
+            echo "      target_port = 80" >> services.tf
+            echo "    }" >> services.tf
+            echo "    type = \"LoadBalancer\"" >> services.tf
+            echo "  }" >> services.tf
+            echo "}" >> services.tf
+            echo "output \"lb_ip\" {" >> services.tf
+            echo "value = kubernetes_service.ads_service.load_balancer_ingress[0]" >> services.tf
+            echo "}" >> services.tf
 
 
         echo "updating service account permissions to deploy from project's container image repository"

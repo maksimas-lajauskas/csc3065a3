@@ -31,7 +31,7 @@ def query(query_string):
 		for each_word in query_string_tokenised:
 			matchscore.append(0)
 		for i in range(0,len(query_string_tokenised)):
-			print("searching "+row.row_key+" for "+query_string_tokenised[i].casefold())
+			print("searching "+row.row_key.decode()+" for "+query_string_tokenised[i].casefold())
 			if pagetext.casefold().find(query_string_tokenised[i].casefold()) >= 0:
 				matchscore[i] = 1
 				print("match")
