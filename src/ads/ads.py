@@ -53,11 +53,11 @@ if provider == "GCP":
 
 
 def get_image_from_url(url):
-	filename = uuid().hex
-	subprocess.call(["wget","-O",filename,url])
-	img = Image.open(filename)
-	subprocess.call(["rm",filename])
-	return img
+    filename = uuid().hex
+    subprocess.call(["wget","-O",filename,url])
+    img = Image.open(filename)
+    subprocess.call(["rm",filename])
+    return img
 
 
 def respond(contents):
@@ -74,7 +74,7 @@ def write(url, text, img):
 
 def write_gcp(url, text, img):
     try:
-    	#bytes([x]) encodes int to bytes
+        #bytes([x]) encodes int to bytes
         row_key = url
         row = gcp_bigtable_ads_table.row(row_key)
         timestamp = datetime.datetime.utcnow()
@@ -139,12 +139,12 @@ def query_gcp(query_string):
         if sum(matchscore) < len(matchscore):
             continue
         else:
-        	advert_data = {}
-        	advert_data["matches"] = sum(matchscore)
-        	advert_data["img_width"] = int(binascii.b2a_hex(row.cells[gcp_bigtable_ads_colfam][common_ads_image_width_column_name.encode()][0].value).decode())
-        	advert_data["img_height"] = int(binascii.b2a_hex(row.cells[gcp_bigtable_ads_colfam][common_ads_image_height_column_name.encode()][0].value).decode())
-        	advert_data["img_mode"] = row.cells[gcp_bigtable_ads_colfam][common_ads_image_mode_column_name.encode()][0].value.decode()
-        	advert_data["img_bytes"] = row.cells[gcp_bigtable_ads_colfam][common_ads_image_column_name.encode()][0].value
+            advert_data = {}
+            advert_data["matches"] = sum(matchscore)
+            advert_data["img_width"] = int(binascii.b2a_hex(row.cells[gcp_bigtable_ads_colfam][common_ads_image_width_column_name.encode()][0].value).decode())
+            advert_data["img_height"] = int(binascii.b2a_hex(row.cells[gcp_bigtable_ads_colfam][common_ads_image_height_column_name.encode()][0].value).decode())
+            advert_data["img_mode"] = row.cells[gcp_bigtable_ads_colfam][common_ads_image_mode_column_name.encode()][0].value.decode()
+            advert_data["img_bytes"] = row.cells[gcp_bigtable_ads_colfam][common_ads_image_column_name.encode()][0].value
             results.update({row.row_key : advert_data})
     return results
 
@@ -172,17 +172,17 @@ def build_html_start():
 """
 
 def build_img(filename, imgdata):
-	try:
-		img = Image.frombytes(
-		mode = imgdata.get("img_mode"),
-		size = (imgdata.get("img_width"), imgdata.get("img_height")),
-		data = imgdata.get("img_bytes")
-		)
-		img.save(filename)
-		remove_candidates.append((datetime.datetime.utcnow().timestamp()),filename)
-		return True
-	except:
-		return False
+    try:
+        img = Image.frombytes(
+        mode = imgdata.get("img_mode"),
+        size = (imgdata.get("img_width"), imgdata.get("img_height")),
+        data = imgdata.get("img_bytes")
+        )
+        img.save(filename)
+        remove_candidates.append((datetime.datetime.utcnow().timestamp()),filename)
+        return True
+    except:
+        return False
 
 
 def build_html_respage(results):
@@ -206,20 +206,20 @@ def build_html_respage(results):
         <div>
 """
     for result in results.keys():
-    	filename = uuid().hex+".jpg"
-    	if build_img(filename, results.get(result)) is False:
-    		continue
-		else:
-			respage += f"""
+        filename = uuid().hex+".jpg"
+        if build_img(filename, results.get(result)) is False:
+            continue
+        else:
+            respage += f"""
 <div>
-	<a href="{result}">
-		<img src="{filename}" alt="{result}" style="width:{results.get("img_width")}px;height:{results.get("img_height")}px;border:0;">
-	</a> 
+    <a href="{result}">
+        <img src="{filename}" alt="{result}" style="width:{results.get(result).get("img_width")}px;height:{results.get(result).get("img_height")}px;border:0;">
+    </a> 
 </div>
 """
     respage+="""
-    	</div>
-    	<hr/>
+        </div>
+        <hr/>
     <body>
 </html>
 """
@@ -231,19 +231,19 @@ def build_html_respage(results):
 def page_separator():
   rqa = request.args  
   try:
-  	img = get_image_from_url(rqa.get("imgurl"))
-  	write(rqa.get("url"),rqa.get("keywords"),img)
-    response = respond(build_html_respage(query(rqa.get("keywords"))))
-    cleanup()
-    return response
+      img = get_image_from_url(rqa.get("imgurl"))
+      write(rqa.get("url"),rqa.get("keywords"),img)
+      response = respond(build_html_respage(query(rqa.get("keywords"))))
+      cleanup()
+      return response
   except:
     return respond(build_html_start())   
 
 def cleanup():
-	for item in remove_candidates:
-		if item[0]+common_image_file_persist_seconds < datetime.datetime.utcnow().timestamp():
-			os.remove(item[1])
-			remove_candidates.remove(item)
+    for item in remove_candidates:
+        if item[0]+common_image_file_persist_seconds < datetime.datetime.utcnow().timestamp():
+            os.remove(item[1])
+            remove_candidates.remove(item)
 
     
 #run server
@@ -251,6 +251,6 @@ def run():
   serve(app, host='0.0.0.0', port=80)
 
 
-run hook
+# run hook
 if __name__ == "__main__":
   run()

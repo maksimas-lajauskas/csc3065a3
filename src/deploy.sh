@@ -502,6 +502,7 @@ then
             echo "                          name = \"COMMON_PAGE_CONTENT_COLUMN_NAME\"" >> pods.tf
             echo "                          value = \"$common_page_content_column_name\"" >> pods.tf
             echo "                    }" >> pods.tf
+            echo "                    env {" >> pods.tf
             echo "                          name = \"GCP_BIGTABLE_ADS_TABLE\"" >> pods.tf
             echo "                          value = \"$gcp_bigtable_ads_table\"" >> pods.tf
             echo "                    }" >> pods.tf
@@ -547,7 +548,7 @@ then
             echo "}" >> pods.tf
 
             #registering LB for search
-            echo "resource "kubernetes_service" "search_service" {" > services.tf
+            echo "resource "kubernetes_service" "search_service" {" >> services.tf
             echo "  metadata {" >> services.tf
             echo "    name = \"search-service\"" >> services.tf
             echo "  }" >> services.tf
@@ -563,7 +564,7 @@ then
             echo "  }" >> services.tf
             echo "}" >> services.tf
 
-            echo "output \"lb_ip\" {" >> services.tf
+            echo "output \"lb_ip_search\" {" >> services.tf
             echo "value = kubernetes_service.search_service.load_balancer_ingress[0]" >> services.tf
             echo "}" >> services.tf
 
@@ -676,7 +677,7 @@ then
             echo "}" >> pods.tf
 
             #registering LB for ads
-            echo "resource "kubernetes_service" "ads_service" {" > services.tf
+            echo "resource "kubernetes_service" "ads_service" {" >> services.tf
             echo "  metadata {" >> services.tf
             echo "    name = \"ads-service\"" >> services.tf
             echo "  }" >> services.tf
@@ -691,7 +692,7 @@ then
             echo "    type = \"LoadBalancer\"" >> services.tf
             echo "  }" >> services.tf
             echo "}" >> services.tf
-            echo "output \"lb_ip\" {" >> services.tf
+            echo "output \"lb_ip_ads\" {" >> services.tf
             echo "value = kubernetes_service.ads_service.load_balancer_ingress[0]" >> services.tf
             echo "}" >> services.tf
 
