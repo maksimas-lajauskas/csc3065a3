@@ -528,7 +528,7 @@ then
             echo "                    }" >> pods.tf
             echo "                    env {" >> pods.tf
             echo "                          name = \"COMMON_ADS_IMAGE_MODE_COLUMN_NAME\"" >> pods.tf
-            echo "                          value = \"$common_ads_image_column_name\"" >> pods.tf
+            echo "                          value = \"$common_ads_image_mode_column_name\"" >> pods.tf
             echo "                    }" >> pods.tf
             echo "                    env {" >> pods.tf
             echo "                          name = \"COMMON_IMAGE_FILE_PERSIST_SECONDS\"" >> pods.tf
@@ -657,7 +657,7 @@ then
             echo "                    }" >> pods.tf
             echo "                    env {" >> pods.tf
             echo "                          name = \"COMMON_ADS_IMAGE_MODE_COLUMN_NAME\"" >> pods.tf
-            echo "                          value = \"$common_ads_image_column_name\"" >> pods.tf
+            echo "                          value = \"$common_ads_image_mode_column_name\"" >> pods.tf
             echo "                    }" >> pods.tf
             echo "                    env {" >> pods.tf
             echo "                          name = \"COMMON_IMAGE_FILE_PERSIST_SECONDS\"" >> pods.tf

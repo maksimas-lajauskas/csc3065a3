@@ -13,6 +13,7 @@ import os
 from bs4 import BeautifulSoup
 import datetime
 from google.cloud import bigtable
+import binascii
 
 app = Flask(__name__)
 cors = CORS(app)
@@ -103,7 +104,7 @@ def build_img(filename, imgdata):
         data = imgdata.get("img_bytes")
         )
         img.save(filename)
-        remove_candidates.append((datetime.datetime.utcnow().timestamp()),filename)
+        remove_candidates.append((datetime.datetime.utcnow().timestamp(), filename))
         return True
     except:
         return False
@@ -139,8 +140,8 @@ def ads_query_gcp(query_string):
         else:
             advert_data = {}
             advert_data["matches"] = sum(matchscore)
-            advert_data["img_width"] = int(binascii.b2a_hex(row.cells[gcp_bigtable_ads_colfam][common_ads_image_width_column_name.encode()][0].value).decode())
-            advert_data["img_height"] = int(binascii.b2a_hex(row.cells[gcp_bigtable_ads_colfam][common_ads_image_height_column_name.encode()][0].value).decode())
+            advert_data["img_width"] = int(binascii.b2a_hex(row.cells[gcp_bigtable_ads_colfam][common_ads_image_width_column_name.encode()][0].value).decode(), 16)
+            advert_data["img_height"] = int(binascii.b2a_hex(row.cells[gcp_bigtable_ads_colfam][common_ads_image_height_column_name.encode()][0].value).decode(), 16)
             advert_data["img_mode"] = row.cells[gcp_bigtable_ads_colfam][common_ads_image_mode_column_name.encode()][0].value.decode()
             advert_data["img_bytes"] = row.cells[gcp_bigtable_ads_colfam][common_ads_image_column_name.encode()][0].value
             results.update({row.row_key : advert_data})

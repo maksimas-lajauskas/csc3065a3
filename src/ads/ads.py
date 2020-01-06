@@ -15,6 +15,7 @@ import os
 from bs4 import BeautifulSoup
 import datetime
 from google.cloud import bigtable
+import binascii
 
 app = Flask(__name__)
 cors = CORS(app)
@@ -82,13 +83,13 @@ def write_gcp(url, text, img):
             gcp_bigtable_ads_colfam.encode(),
             common_ads_keywords_list_column_name.encode(),
             text.encode(),
-            timestamp=timestamp,
+            timestamp=timestamp
         )
         row.set_cell(#width
             gcp_bigtable_ads_colfam.encode(),
             common_ads_image_width_column_name.encode(),
             bytes([img.size[0]]),
-            timestamp=timestamp,
+            timestamp=timestamp
         )
         row.set_cell(#height
             gcp_bigtable_ads_colfam.encode(),
@@ -141,11 +142,11 @@ def query_gcp(query_string):
         else:
             advert_data = {}
             advert_data["matches"] = sum(matchscore)
-            advert_data["img_width"] = int(binascii.b2a_hex(row.cells[gcp_bigtable_ads_colfam][common_ads_image_width_column_name.encode()][0].value).decode())
-            advert_data["img_height"] = int(binascii.b2a_hex(row.cells[gcp_bigtable_ads_colfam][common_ads_image_height_column_name.encode()][0].value).decode())
+            advert_data["img_width"] = int(binascii.b2a_hex(row.cells[gcp_bigtable_ads_colfam][common_ads_image_width_column_name.encode()][0].value).decode(), 16)
+            advert_data["img_height"] = int(binascii.b2a_hex(row.cells[gcp_bigtable_ads_colfam][common_ads_image_height_column_name.encode()][0].value).decode(), 16)
             advert_data["img_mode"] = row.cells[gcp_bigtable_ads_colfam][common_ads_image_mode_column_name.encode()][0].value.decode()
             advert_data["img_bytes"] = row.cells[gcp_bigtable_ads_colfam][common_ads_image_column_name.encode()][0].value
-            results.update({row.row_key : advert_data})
+            results.update({row.row_key.decode() : advert_data})
     return results
 
 
@@ -179,7 +180,7 @@ def build_img(filename, imgdata):
         data = imgdata.get("img_bytes")
         )
         img.save(filename)
-        remove_candidates.append((datetime.datetime.utcnow().timestamp()),filename)
+        remove_candidates.append((datetime.datetime.utcnow().timestamp(), filename))
         return True
     except:
         return False
@@ -213,7 +214,7 @@ def build_html_respage(results):
             respage += f"""
 <div>
     <a href="{result}">
-        <img src="{filename}" alt="{result}" style="width:{results.get(result).get("img_width")}px;height:{results.get(result).get("img_height")}px;border:0;">
+        <img src="/{filename}" alt="{result}" style="width:{results.get(result).get("img_width")}px;height:{results.get(result).get("img_height")}px;border:0;">
     </a> 
 </div>
 """
