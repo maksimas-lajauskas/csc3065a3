@@ -7,5 +7,4 @@ RUN apt-get update \
     && mkdir /templates \
     && mkdir /static
 COPY ./templates /templates
-#CMD ["python3", "/search.py"]
-CMD ["ping", "google.com"]
+CMD ["python3", "/search.py"]
