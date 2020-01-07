@@ -1,7 +1,7 @@
 import subprocess
 from uuid import uuid1 as uuid
 from PIL import Image
-from flask import Flask, request, jsonify, Response
+from flask import Flask, render_template
 from waitress import serve
 from flask_cors import CORS, cross_origin
 import subprocess
@@ -17,7 +17,7 @@ import datetime
 from google.cloud import bigtable
 import binascii
 
-app = Flask(__name__)
+app = Flask(__name__, static_url_path="/static")
 cors = CORS(app)
 
 # common vars
@@ -51,6 +51,16 @@ if provider == "GCP":
         os.environ["GCP_BIGTABLE_ADS_TABLE"]
     )
     gcp_bigtable_ads_colfam = os.environ["GCP_BIGTABLE_ADS_COLUMN_FAMILY"]
+
+
+def record_error():
+    errstring = str(datetime.datetime.utcnow())+":\t"+str(sys.exc_info())+"\n"
+    f = open("ads.err.log", "a+")
+    f.write(errstring)
+    f.close()
+    print("ERROR:\t"+errstring)
+    
+
 
 
 def get_image_from_url(url):
@@ -112,11 +122,7 @@ def write_gcp(url, text, img):
         gcp_bigtable_ads_table.mutate_rows([row])
         return True
     except:
-        errstring = str(datetime.datetime.utcnow())+":\t"+str(sys.exc_info())+"\n"
-        f = open("ads.err.log", "a+")
-        f.write(errstring)
-        f.close()
-        print("ERROR:\t"+errstring)
+        record_error()
         return False
 
 
@@ -150,28 +156,6 @@ def query_gcp(query_string):
     return results
 
 
-def build_html_start():
-    return """
-<!DOCTYPE html>
-<html>
-    <body>
-        <h1>QSE Ads Engine</h1>
-        <form action="/" method="get">
-            Your target url:<br/>
-            <input type="text" name="url"><br/>
-            Keywords (comma-separated without spaces, e.g. <i>friendly,honest,services</i>):<br/>
-            <input type="text" name="keywords"><br/>
-            Image URL of the ad that will be displayed:<br/>
-            <input type="text" name="imgurl"><br/>
-            <input type="submit" value="Submit QSE Ad">
-        </form>
-        <p>Note: on successful submission the advert will display below this form.</p>
-        <p>Your ad will be displayed on the results page above the search results for queries matching your ad's keywords.</p>
-        <hr/>
-    <body>
-</html>
-"""
-
 def build_img(filename, imgdata):
     try:
         img = Image.frombytes(
@@ -179,52 +163,23 @@ def build_img(filename, imgdata):
         size = (imgdata.get("img_width"), imgdata.get("img_height")),
         data = imgdata.get("img_bytes")
         )
-        img.save(filename)
+        img.save("/static/"+filename)
         remove_candidates.append((datetime.datetime.utcnow().timestamp(), filename))
         return True
     except:
         return False
 
 
-def build_html_respage(results):
-    respage = """
-<!DOCTYPE html>
-<html>
-    <body>
-        <h1>QSE Ads Engine</h1>
-        <form action="/" method="get">
-            Your target url:<br/>
-            <input type="text" name="url"><br/>
-            Keywords (comma-separated, e.g. <i>friendly,honest,services</i>):<br/>
-            <input type="text" name="keywords"><br/>
-            Image URL of the ad that will be displayed:<br/>
-            <input type="text" name="imgurl"><br/>
-            <input type="submit" value="Submit QSE Ad">
-        </form>
-        <p>Note: on successful submission the advert will display below this form.</p>
-        <p>Your ad will be displayed on the results page above the search results for queries matching your ad's keywords.</p>
-        <hr/>
-        <div>
-"""
+def build_ads_payload(results):
+    ads_payload = {}
     for result in results.keys():
         filename = uuid().hex+".jpg"
         if build_img(filename, results.get(result)) is False:
             continue
         else:
-            respage += f"""
-<div>
-    <a href="{result}">
-        <img src="/{filename}" alt="{result}" style="width:{results.get(result).get("img_width")}px;height:{results.get(result).get("img_height")}px;border:0;">
-    </a> 
-</div>
-"""
-    respage+="""
-        </div>
-        <hr/>
-    <body>
-</html>
-"""
-    return respage
+        	ads_payload[result] = filename
+        	continue
+    return ads_payload
 
 
 #THE SEP-arator (because / separates files and also stands for Search Engine Page and also method separates blank page from query page calls, endless fun!)
@@ -234,16 +189,17 @@ def page_separator():
   try:
       img = get_image_from_url(rqa.get("imgurl"))
       write(rqa.get("url"),rqa.get("keywords"),img)
-      response = respond(build_html_respage(query(rqa.get("keywords"))))
+      ads_payload = build_ads_payload(query(rqa.get("keywords")))
       cleanup()
-      return response
+      return render_template("serp.html", ads_payload=ads_payload)
   except:
-    return respond(build_html_start())   
+    return render_template("index.html")
+
 
 def cleanup():
     for item in remove_candidates:
         if item[0]+common_image_file_persist_seconds < datetime.datetime.utcnow().timestamp():
-            os.remove(item[1])
+            os.remove("/static/"+item[1])
             remove_candidates.remove(item)
 
     

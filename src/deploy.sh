@@ -236,6 +236,7 @@ then
                 #search
                 echo "building search pod image with provided keys..."
                 cd $(pwd)/search/GCP
+                cp -r ../templates/ . #todo: tie this in after ads service tests out with dynamic image load
                 cp ../search.py ./search.py
                 cp "$gcp_key_json" ./gcp_keys.json
                 searchID="search-gcp-$(deployment_id)"
@@ -251,6 +252,7 @@ then
                 #ads
                 echo "building ads pod image with provided keys..."
                 cd $(pwd)/ads/GCP
+                cp -r ../templates/ .
                 cp ../ads.py ./ads.py
                 cp "$gcp_key_json" ./gcp_keys.json
                 adsID="ads-gcp-$(deployment_id)"
@@ -349,11 +351,11 @@ then
                 then
                     num_crawlers="$default_num_crawlers"
                 fi
-            echo "resource \"kubernetes_deployment\" \"$crawlerID\" {" >> pods.tf
+            echo "resource \"kubernetes_deployment\" \"qse-crawler\" {" >> pods.tf
             echo "    metadata {" >> pods.tf
-            echo "        name = \"$crawlerID\"" >> pods.tf
+            echo "        name = \"qse-crawler\"" >> pods.tf
             echo "        labels = {" >> pods.tf
-            echo "            App = \"$crawlerID\"" >> pods.tf
+            echo "            App = \"qse-crawler\"" >> pods.tf
             echo "        }" >> pods.tf
             echo "    }" >> pods.tf
             echo "    spec {" >> pods.tf
@@ -367,19 +369,19 @@ then
             echo "        }" >> pods.tf
             echo "        selector {" >> pods.tf
             echo "            match_labels = {" >> pods.tf
-            echo "                App = \"$crawlerID\"" >> pods.tf
+            echo "                App = \"qse-crawler\"" >> pods.tf
             echo "            }" >> pods.tf
             echo "        }" >> pods.tf
             echo "        template {" >> pods.tf
             echo "            metadata{" >> pods.tf
             echo "                labels = {" >> pods.tf
-            echo "                    App = \"$crawlerID\"" >> pods.tf
+            echo "                    App = \"qse-crawler\"" >> pods.tf
             echo "                }" >> pods.tf
             echo "            }" >> pods.tf
             echo "            spec {" >> pods.tf
             echo "                container {" >> pods.tf
             echo "                    image = \"$crawler_gcr_tag@$crawler_sha\"" >> pods.tf
-            echo "                    name  = \"$crawlerID\"" >> pods.tf
+            echo "                    name  = \"qse-crawler\"" >> pods.tf
             echo "                    resources {" >> pods.tf
             echo "                                limits {" >> pods.tf
             echo "                                  cpu    = \"0.5\"" >> pods.tf
@@ -433,11 +435,11 @@ then
                 then
                     num_search_pods="$default_num_search_pods"
                 fi
-            echo "resource \"kubernetes_deployment\" \"$searchID\" {" >> pods.tf
+            echo "resource \"kubernetes_deployment\" \"qse-search\" {" >> pods.tf
             echo "    metadata {" >> pods.tf
-            echo "        name = \"$searchID\"" >> pods.tf
+            echo "        name = \"qse-search\"" >> pods.tf
             echo "        labels = {" >> pods.tf
-            echo "            App = \"$searchID\"" >> pods.tf
+            echo "            App = \"qse-search\"" >> pods.tf
             echo "        }" >> pods.tf
             echo "    }" >> pods.tf
             echo "    spec {" >> pods.tf
@@ -451,19 +453,19 @@ then
             echo "        }" >> pods.tf
             echo "        selector {" >> pods.tf
             echo "            match_labels = {" >> pods.tf
-            echo "                App = \"$searchID\"" >> pods.tf
+            echo "                App = \"qse-search\"" >> pods.tf
             echo "            }" >> pods.tf
             echo "        }" >> pods.tf
             echo "        template {" >> pods.tf
             echo "            metadata{" >> pods.tf
             echo "                labels = {" >> pods.tf
-            echo "                    App = \"$searchID\"" >> pods.tf
+            echo "                    App = \"qse-search\"" >> pods.tf
             echo "                }" >> pods.tf
             echo "            }" >> pods.tf
             echo "            spec {" >> pods.tf
             echo "                container {" >> pods.tf
             echo "                    image = \"$search_gcr_tag@$search_sha\"" >> pods.tf
-            echo "                    name  = \"$searchID\"" >> pods.tf
+            echo "                    name  = \"qse-search\"" >> pods.tf
             echo "                    resources {" >> pods.tf
             echo "                                limits {" >> pods.tf
             echo "                                  cpu    = \"0.5\"" >> pods.tf
@@ -554,7 +556,7 @@ then
             echo "  }" >> services.tf
             echo "  spec {" >> services.tf
             echo "    selector = {" >> services.tf
-            echo "      App = kubernetes_deployment.$searchID.spec.0.template.0.metadata[0].labels.App" >> services.tf
+            echo "      App = kubernetes_deployment.qse-search.spec.0.template.0.metadata[0].labels.App" >> services.tf
             echo "    }" >> services.tf
             echo "    port {" >> services.tf
             echo "      port        = 80" >> services.tf
@@ -574,11 +576,11 @@ then
                 then
                     num_ads_pods="$default_num_ads_pods"
                 fi
-            echo "resource \"kubernetes_deployment\" \"$adsID\" {" >> pods.tf
+            echo "resource \"kubernetes_deployment\" \"qse-ads\" {" >> pods.tf
             echo "    metadata {" >> pods.tf
-            echo "        name = \"$adsID\"" >> pods.tf
+            echo "        name = \"qse-ads\"" >> pods.tf
             echo "        labels = {" >> pods.tf
-            echo "            App = \"$adsID\"" >> pods.tf
+            echo "            App = \"qse-ads\"" >> pods.tf
             echo "        }" >> pods.tf
             echo "    }" >> pods.tf
             echo "    spec {" >> pods.tf
@@ -592,19 +594,19 @@ then
             echo "        }" >> pods.tf
             echo "        selector {" >> pods.tf
             echo "            match_labels = {" >> pods.tf
-            echo "                App = \"$adsID\"" >> pods.tf
+            echo "                App = \"qse-ads\"" >> pods.tf
             echo "            }" >> pods.tf
             echo "        }" >> pods.tf
             echo "        template {" >> pods.tf
             echo "            metadata{" >> pods.tf
             echo "                labels = {" >> pods.tf
-            echo "                    App = \"$adsID\"" >> pods.tf
+            echo "                    App = \"qse-ads\"" >> pods.tf
             echo "                }" >> pods.tf
             echo "            }" >> pods.tf
             echo "            spec {" >> pods.tf
             echo "                container {" >> pods.tf
             echo "                    image = \"$ads_gcr_tag@$ads_sha\"" >> pods.tf
-            echo "                    name  = \"$adsID\"" >> pods.tf
+            echo "                    name  = \"qse-ads\"" >> pods.tf
             echo "                    resources {" >> pods.tf
             echo "                                limits {" >> pods.tf
             echo "                                  cpu    = \"0.5\"" >> pods.tf
@@ -683,7 +685,7 @@ then
             echo "  }" >> services.tf
             echo "  spec {" >> services.tf
             echo "    selector = {" >> services.tf
-            echo "      App = kubernetes_deployment.$adsID.spec.0.template.0.metadata[0].labels.App" >> services.tf
+            echo "      App = kubernetes_deployment.qse-ads.spec.0.template.0.metadata[0].labels.App" >> services.tf
             echo "    }" >> services.tf
             echo "    port {" >> services.tf
             echo "      port        = 80" >> services.tf
