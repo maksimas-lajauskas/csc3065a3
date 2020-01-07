@@ -1,5 +1,7 @@
 # Superbasic crawler implementation - Maksimas Lajauskas 40073762
-from flask import Flask, request, jsonify, Response
+from uuid import uuid1 as uuid
+from PIL import Image
+from flask import Flask, request, render_template
 from waitress import serve
 from flask_cors import CORS, cross_origin
 import subprocess
@@ -59,11 +61,6 @@ if provider == "GCP":
     gcp_bigtable_ads_colfam = os.environ["GCP_BIGTABLE_ADS_COLUMN_FAMILY"]
 
 
-def respond(contents):
-  response = Response(contents)
-  return response
-
-
 def query(query_string):
     if provider == "GCP":
         return query_gcp(query_string)
@@ -89,11 +86,14 @@ def query_gcp(query_string):
 
 
 def get_image_from_url(url):
-    filename = uuid().hex
-    subprocess.call(["wget","-O",filename,url])
-    img = Image.open(filename)
-    subprocess.call(["rm",filename])
-    return img
+    try:
+        filename = uuid().hex
+        subprocess.call(["wget","-O",filename,url])
+        img = Image.open(filename)
+        subprocess.call(["rm",filename])
+        return img
+    except:
+        record_error()
 
 
 def build_img(filename, imgdata):
@@ -103,19 +103,22 @@ def build_img(filename, imgdata):
         size = (imgdata.get("img_width"), imgdata.get("img_height")),
         data = imgdata.get("img_bytes")
         )
-        img.save(filename)
+        img.save("/static/"+filename)
         remove_candidates.append((datetime.datetime.utcnow().timestamp(), filename))
         return True
     except:
+        record_error()
         return False
 
 
 def cleanup():
-    for item in remove_candidates:
-        if item[0]+common_image_file_persist_seconds < datetime.datetime.utcnow().timestamp():
-            os.remove(item[1])
-            remove_candidates.remove(item)
-
+    try:
+        for item in remove_candidates:
+            if item[0]+common_image_file_persist_seconds < datetime.datetime.utcnow().timestamp():
+                os.remove("/static/"+item[1])
+                remove_candidates.remove(item)
+    except:
+        record_error()
 
 
 def ads_query(query_string):
@@ -125,102 +128,63 @@ def ads_query(query_string):
 
 def ads_query_gcp(query_string):
     results = {}
-    query_string_tokenised = query_string.split(",")
-    for row in gcp_bigtable_ads_table.read_rows():
-        pagetext = row.cells[gcp_bigtable_ads_colfam][common_ads_keywords_list_column_name.encode()][0].value.decode()
-        #accumulator
-        matchscore = []
-        for each_word in query_string_tokenised:
-            matchscore.append(0)
-        for i in range(0,len(query_string_tokenised)):
-            if pagetext.casefold().find(query_string_tokenised[i].casefold()) >= 0:
-                matchscore[i] = 1
-        if sum(matchscore) == 0:
-            continue
-        else:
-            advert_data = {}
-            advert_data["matches"] = sum(matchscore)
-            advert_data["img_width"] = int(binascii.b2a_hex(row.cells[gcp_bigtable_ads_colfam][common_ads_image_width_column_name.encode()][0].value).decode(), 16)
-            advert_data["img_height"] = int(binascii.b2a_hex(row.cells[gcp_bigtable_ads_colfam][common_ads_image_height_column_name.encode()][0].value).decode(), 16)
-            advert_data["img_mode"] = row.cells[gcp_bigtable_ads_colfam][common_ads_image_mode_column_name.encode()][0].value.decode()
-            advert_data["img_bytes"] = row.cells[gcp_bigtable_ads_colfam][common_ads_image_column_name.encode()][0].value
-            results.update({row.row_key : advert_data})
-    return results
+    try:
+        query_string_tokenised = query_string.split(" ")
+        for row in gcp_bigtable_ads_table.read_rows():
+            pagetext = row.cells[gcp_bigtable_ads_colfam][common_ads_keywords_list_column_name.encode()][0].value.decode()
+            matchscore = [] #accumulator
+            for each_word in query_string_tokenised:
+                matchscore.append(0)
+            for i in range(0,len(query_string_tokenised)):
+                if pagetext.casefold().find(query_string_tokenised[i].casefold()) >= 0:
+                    matchscore[i] = 1
+            if sum(matchscore) > 0:
+                advert_data = {}
+                advert_data["matches"] = sum(matchscore)
+                advert_data["img_width"] = int(binascii.b2a_hex(row.cells[gcp_bigtable_ads_colfam][common_ads_image_width_column_name.encode()][0].value).decode(), 16)
+                advert_data["img_height"] = int(binascii.b2a_hex(row.cells[gcp_bigtable_ads_colfam][common_ads_image_height_column_name.encode()][0].value).decode(), 16)
+                advert_data["img_mode"] = row.cells[gcp_bigtable_ads_colfam][common_ads_image_mode_column_name.encode()][0].value.decode()
+                advert_data["img_bytes"] = row.cells[gcp_bigtable_ads_colfam][common_ads_image_column_name.encode()][0].value
+                results.update({row.row_key.decode() : advert_data})
+        return results
+    except:
+        record_error()
+        return results
 
 
-def build_html_start():
-    return """
-<!DOCTYPE html>
-<html>
-    <body>
-        <h1>QSE Search Engine</h1>
-        <form action="/" method="get">
-            <input type="text" name="q">
-            <input type="submit" value="QSE Search">
-        </form>
-        <hr/>
-    <body>
-</html>
-"""
+def build_ads_payload(results):
+    ads_payload = {}
+    try:
+        for result in results.keys():
+            filename = uuid().hex+".gif"
+            if build_img(filename, results.get(result)) is True:
+                ads_payload[result] = filename
+    except:
+        record_error()
+    return ads_payload
 
 
-def build_html_serp(search_results, ad_results):
-    serp = """
-<!DOCTYPE html>
-<html>
-    <body>
-        <h1>QSE Search Engine</h1>
-        <form action="/" method="get">
-            <input type="text" name="q">
-            <input type="submit" value="QSE Search">
-        </form>
-        <hr/>
-        <div>
-"""
-    limit = min(len(ad_results), common_max_ads_per_page)
-    count = 0
-    for result in ad_results.keys():
-        if count == limit:
-          break
-        filename = uuid().hex+".jpg"
-        if build_img(filename, ad_results.get(result)) is False:
-            continue
-        else:
-            count += 1
-            respage += f"""
-<div>
-    <a href="{result}">
-        <img src="{filename}" alt="{result}" style="width:{results.get("img_width")}px;height:{results.get("img_height")}px;border:0;">
-    </a> 
-</div>
-"""
-    serp += """
-</div>
-<hr/>
-"""
-    for result in search_results.keys():
-        serp+=f"""
-<div>
-    <a href="http://{result}">{result}</a><br/>
-    <p>{search_results.get(result)}</p>
-</div>
-"""
-    serp+="""
-    <body>
-</html>
-"""
-    return serp
+def record_error():
+    errstring = str(datetime.datetime.utcnow())+":\t"+str(sys.exc_info())+"\n"
+    f = open("ads.err.log", "a+")
+    f.write(errstring)
+    f.close()
+    print("ERROR:\t"+errstring)
 
 
 #THE SEP-arator (because / separates files and also stands for Search Engine Page and also method separates blank page from query page calls, endless fun!)
 @app.route("/", methods=["GET"])
-def page_separator():
+def serve_page():
   rqa = request.args  
   try:
-    q = rqa.get("q")
-    return respond(build_html_serp(query(q), ads_query(q)))
+      ads_payload = build_ads_payload(ads_query(rqa.get("q")))
+      results_payload = query(rqa.get("q"))
+      cleanup()
+      return render_template("serp.html", ads_payload=ads_payload, results_payload=results_payload)
   except:
-    return respond(build_html_start())   
+      record_error()
+      cleanup()
+      return render_template("index.html")
 
     
 #run server

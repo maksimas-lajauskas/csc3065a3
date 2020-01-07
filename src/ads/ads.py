@@ -174,7 +174,7 @@ def build_ads_payload(results):
     ads_payload = {}
     try:
         for result in results.keys():
-            filename = uuid().hex+".jpg"
+            filename = uuid().hex+".gif"
             if build_img(filename, results.get(result)) is True:
                 ads_payload[result] = filename
     except:
@@ -193,6 +193,7 @@ def page_separator():
       cleanup()
       return render_template("serp.html", ads_payload=ads_payload)
   except:
+      cleanup()
       record_error()
       return render_template("index.html")
 
