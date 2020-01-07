@@ -71,9 +71,11 @@ def crawl_random():
         print("Attempting: "+addr_str)
         # send request
         req = None
+        prefix = "https://"
         try:
             req = requests.get(f"https://{addr_str}", timeout=10)
         except:
+            prefix = "http://"
             req = requests.get(f"http://{addr_str}", timeout=10)
         bs = BeautifulSoup(req.text, "lxml")
         domain_name = None
@@ -82,7 +84,7 @@ def crawl_random():
         except:
             domain_name = addr_str
         f = open("crawler.storage.log", "a+")
-        f.write(str(datetime.datetime.utcnow())+":\t"+str({domain_name : bs.text})+"\n")
+        f.write(str(datetime.datetime.utcnow())+":\t"+str({prefix+domain_name : bs.text})+"\n")
         f.close()
         if write(domain_name, bs.text):
             print("success"+domain_name)
