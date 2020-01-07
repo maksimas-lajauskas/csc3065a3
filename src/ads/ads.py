@@ -1,7 +1,7 @@
 import subprocess
 from uuid import uuid1 as uuid
 from PIL import Image
-from flask import Flask, render_template
+from flask import Flask, render_template, request
 from waitress import serve
 from flask_cors import CORS, cross_origin
 import subprocess
@@ -17,8 +17,10 @@ import datetime
 from google.cloud import bigtable
 import binascii
 
+
 app = Flask(__name__, static_url_path="/static")
 cors = CORS(app)
+
 
 # common vars
 provider = os.environ["QSEPROVIDER"]#storage interface
@@ -59,21 +61,17 @@ def record_error():
     f.write(errstring)
     f.close()
     print("ERROR:\t"+errstring)
-    
-
 
 
 def get_image_from_url(url):
-    filename = uuid().hex
-    subprocess.call(["wget","-O",filename,url])
-    img = Image.open(filename)
-    subprocess.call(["rm",filename])
-    return img
-
-
-def respond(contents):
-  response = Response(contents)
-  return response
+    try:
+        filename = uuid().hex
+        subprocess.call(["wget","-O",filename,url])
+        img = Image.open(filename)
+        subprocess.call(["rm",filename])
+        return img
+    except:
+        record_error()
 
 
 def write(url, text, img):
@@ -126,34 +124,35 @@ def write_gcp(url, text, img):
         return False
 
 
-
 def query(query_string):
     if provider == "GCP":
         return query_gcp(query_string)
 
+
 def query_gcp(query_string):
     results = {}
-    query_string_tokenised = query_string.split(",")
-    for row in gcp_bigtable_ads_table.read_rows():
-        pagetext = row.cells[gcp_bigtable_ads_colfam][common_ads_keywords_list_column_name.encode()][0].value.decode()
-        #accumulator
-        matchscore = []
-        for each_word in query_string_tokenised:
-            matchscore.append(0)
-        for i in range(0,len(query_string_tokenised)):
-            if pagetext.casefold().find(query_string_tokenised[i].casefold()) >= 0:
-                matchscore[i] = 1
-        if sum(matchscore) < len(matchscore):
-            continue
-        else:
-            advert_data = {}
-            advert_data["matches"] = sum(matchscore)
-            advert_data["img_width"] = int(binascii.b2a_hex(row.cells[gcp_bigtable_ads_colfam][common_ads_image_width_column_name.encode()][0].value).decode(), 16)
-            advert_data["img_height"] = int(binascii.b2a_hex(row.cells[gcp_bigtable_ads_colfam][common_ads_image_height_column_name.encode()][0].value).decode(), 16)
-            advert_data["img_mode"] = row.cells[gcp_bigtable_ads_colfam][common_ads_image_mode_column_name.encode()][0].value.decode()
-            advert_data["img_bytes"] = row.cells[gcp_bigtable_ads_colfam][common_ads_image_column_name.encode()][0].value
-            results.update({row.row_key.decode() : advert_data})
-    return results
+    try:
+        query_string_tokenised = query_string.split(",")
+        for row in gcp_bigtable_ads_table.read_rows():
+            pagetext = row.cells[gcp_bigtable_ads_colfam][common_ads_keywords_list_column_name.encode()][0].value.decode()
+            matchscore = [] #accumulator
+            for each_word in query_string_tokenised:
+                matchscore.append(0)
+            for i in range(0,len(query_string_tokenised)):
+                if pagetext.casefold().find(query_string_tokenised[i].casefold()) >= 0:
+                    matchscore[i] = 1
+            if sum(matchscore) == len(matchscore):
+                advert_data = {}
+                advert_data["matches"] = sum(matchscore)
+                advert_data["img_width"] = int(binascii.b2a_hex(row.cells[gcp_bigtable_ads_colfam][common_ads_image_width_column_name.encode()][0].value).decode(), 16)
+                advert_data["img_height"] = int(binascii.b2a_hex(row.cells[gcp_bigtable_ads_colfam][common_ads_image_height_column_name.encode()][0].value).decode(), 16)
+                advert_data["img_mode"] = row.cells[gcp_bigtable_ads_colfam][common_ads_image_mode_column_name.encode()][0].value.decode()
+                advert_data["img_bytes"] = row.cells[gcp_bigtable_ads_colfam][common_ads_image_column_name.encode()][0].value
+                results.update({row.row_key.decode() : advert_data})
+        return results
+    except:
+        record_error()
+        return results
 
 
 def build_img(filename, imgdata):
@@ -167,18 +166,19 @@ def build_img(filename, imgdata):
         remove_candidates.append((datetime.datetime.utcnow().timestamp(), filename))
         return True
     except:
+        record_error()
         return False
 
 
 def build_ads_payload(results):
     ads_payload = {}
-    for result in results.keys():
-        filename = uuid().hex+".jpg"
-        if build_img(filename, results.get(result)) is False:
-            continue
-        else:
-        	ads_payload[result] = filename
-        	continue
+    try:
+        for result in results.keys():
+            filename = uuid().hex+".jpg"
+            if build_img(filename, results.get(result)) is True:
+                ads_payload[result] = filename
+    except:
+        record_error()
     return ads_payload
 
 
@@ -193,14 +193,18 @@ def page_separator():
       cleanup()
       return render_template("serp.html", ads_payload=ads_payload)
   except:
-    return render_template("index.html")
+      record_error()
+      return render_template("index.html")
 
 
 def cleanup():
-    for item in remove_candidates:
-        if item[0]+common_image_file_persist_seconds < datetime.datetime.utcnow().timestamp():
-            os.remove("/static/"+item[1])
-            remove_candidates.remove(item)
+    try:
+        for item in remove_candidates:
+            if item[0]+common_image_file_persist_seconds < datetime.datetime.utcnow().timestamp():
+                os.remove("/static/"+item[1])
+                remove_candidates.remove(item)
+    except:
+        record_error()
 
     
 #run server

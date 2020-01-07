@@ -7,6 +7,7 @@ echo "$(date +%d)-$(date +%m)-$(date +%Y)-$(date +%H)-$(date +%M)-$(date +%S)"
 ############### start vars and config capture
 
 #vars - common
+src_dir=$(pwd)
 provider=""
 num_crawlers=""
 default_num_crawlers=1
@@ -24,6 +25,20 @@ common_ads_image_height_column_name="imgheight"
 common_ads_image_width_column_name="imgwidth"
 common_ads_image_mode_column_name="imgmode"
 common_ads_keywords_list_column_name="adkeywords"
+build_containers="false"
+deploy_pods="false"
+sync_cluster="false"
+
+#container image vars
+crawler_image_build_id=""
+crawler_image_build_sha=""
+full_crawler_image_tag=""
+search_image_build_id=""
+search_image_build_sha=""
+full_search_image_tag=""
+ads_image_build_id=""
+ads_image_build_sha=""
+full_ads_image_tag=""
 
 #vars - gcp
 gcp_proj_id=""
@@ -83,34 +98,54 @@ while (( "$#" )); do
                         ;;
 
             esac
+            shift
             ;;
 
         "--project-id")
             gcp_proj_id="$2"
+            shift
             ;;
 
         "--region")
             gcp_region="$2"
+            shift
             ;;
 
         "--zone")
             gcp_zones+=("$2")
+            shift
             ;;
 
         "--creds-file")
             gcp_key_json="$2"
+            shift
             ;;
 
         "--num-crawlers")
             num_crawlers="$2"
+            shift
             ;;
 
         "--num-search-pods")
             num_search_pods="$2"
+            shift
             ;;
 
         "--num-ads-pods")
             num_ads_pods="$2"
+            shift
+            ;;
+
+        "--build-containers")
+            build_containers="true"
+            ;;
+
+        "--deploy-pods")
+            deploy_pods="true"
+            ;;
+
+        "--sync-cluster")
+            sync_cluster="true"
             ;;
 
         *)
@@ -119,13 +154,11 @@ while (( "$#" )); do
             ;;
 
     esac
-shift 2
+shift
 done
 
 ############### end vars and config capture
 ############### start main flow
-#define src dir
-src_dir=$(pwd)
 
 if [[ "$provider" = "gcp"  ]]
 then
@@ -193,12 +226,13 @@ then
         echo "bigtable api enabled"
     fi
 
-        echo "passing key data to container builder..."
-        #set up path and copy json
-        tfpath="$(pwd)/tf-$provider"
-        key_name="keys_$(deployment_id).json"
-        cp "$gcp_key_json" "$tfpath/$key_name"
+    #set up path and copy json
+    tfpath="$(pwd)/tf-$provider"
+    key_name="keys_$(deployment_id).json"
+    cp "$gcp_key_json" "$tfpath/$key_name"
 
+    if [[ "$build_containers" = "true" ]]
+    then
             #build images
                 echo "starting container build..."
                 #setup docker & dockerd
@@ -220,34 +254,34 @@ then
 
                 #crawler
                 echo "building crawler with provided keys..."
-                cd $(pwd)/crawler/GCP
+                cd $src_dir/crawler/GCP
                 cp ../crawler.py ./crawler.py
                 cp "$gcp_key_json" ./gcp_keys.json
-                crawlerID="crawler-gcp-$(deployment_id)"
-                docker build -t="$crawlerID" .
+                crawler_image_build_id="crawler-gcp-$(deployment_id)"
+                docker build -t="$crawler_image_build_id" .
                 cd "$src_dir"
 
                 echo "tagging and pushing crawler image to project repository..."
-                crawler_gcr_tag="gcr.io/$gcp_proj_id/$crawlerID"
-                docker tag "$crawlerID" "$crawler_gcr_tag:latest"
-                gcloud docker -- push "$crawler_gcr_tag:latest"
-                crawler_sha=$(docker images --digests| grep "$crawler_gcr_tag" | grep -Po "sha256.[[:alnum:]]+")
+                full_crawler_image_tag="gcr.io/$gcp_proj_id/$crawler_image_build_id"
+                docker tag "$crawler_image_build_id" "$full_crawler_image_tag:latest"
+                gcloud docker -- push "$full_crawler_image_tag:latest"
+                crawler_image_build_sha=$(docker images --digests| grep "$full_crawler_image_tag" | grep -Po "sha256.[[:alnum:]]+")
 
                 #search
                 echo "building search pod image with provided keys..."
-                cd $(pwd)/search/GCP
+                cd $src_dir/search/GCP
                 cp -r ../templates/ . #todo: tie this in after ads service tests out with dynamic image load
                 cp ../search.py ./search.py
                 cp "$gcp_key_json" ./gcp_keys.json
-                searchID="search-gcp-$(deployment_id)"
-                docker build -t="$searchID" .
+                search_image_build_id="search-gcp-$(deployment_id)"
+                docker build -t="$search_image_build_id" .
                 cd "$src_dir"
 
                 echo "tagging and pushing search pod image to project repository..."
-                search_gcr_tag="gcr.io/$gcp_proj_id/$searchID"
-                docker tag "$searchID" "$search_gcr_tag:latest"
-                gcloud docker -- push "$search_gcr_tag:latest"
-                search_sha=$(docker images --digests| grep "$search_gcr_tag" | grep -Po "sha256.[[:alnum:]]+")
+                full_search_image_tag="gcr.io/$gcp_proj_id/$search_image_build_id"
+                docker tag "$search_image_build_id" "$full_search_image_tag:latest"
+                gcloud docker -- push "$full_search_image_tag:latest"
+                search_image_build_sha=$(docker images --digests| grep "$full_search_image_tag" | grep -Po "sha256.[[:alnum:]]+")
 
                 #ads
                 echo "building ads pod image with provided keys..."
@@ -255,16 +289,52 @@ then
                 cp -r ../templates/ .
                 cp ../ads.py ./ads.py
                 cp "$gcp_key_json" ./gcp_keys.json
-                adsID="ads-gcp-$(deployment_id)"
-                docker build -t="$adsID" .
+                ads_image_build_id="ads-gcp-$(deployment_id)"
+                docker build -t="$ads_image_build_id" .
                 cd "$src_dir"
 
                 echo "tagging and pushing ads pod image to project repository..."
-                ads_gcr_tag="gcr.io/$gcp_proj_id/$adsID"
-                docker tag "$adsID" "$ads_gcr_tag:latest"
-                gcloud docker -- push "$ads_gcr_tag:latest"
-                ads_sha=$(docker images --digests| grep "$ads_gcr_tag" | grep -Po "sha256.[[:alnum:]]+")
+                full_ads_image_tag="gcr.io/$gcp_proj_id/$ads_image_build_id"
+                docker tag "$ads_image_build_id" "$full_ads_image_tag:latest"
+                gcloud docker -- push "$full_ads_image_tag:latest"
+                ads_image_build_sha=$(docker images --digests| grep "$full_ads_image_tag" | grep -Po "sha256.[[:alnum:]]+")
 
+            else #infer latest tag id's from docker report
+                
+                imagelist=$(docker images | grep -P "gcr\.io/$gcp_proj_id/[[:alnum:]]+-gcp-[[:digit:]]+-[[:digit:]]+-[[:digit:]]+-[[:digit:]]+-[[:digit:]]+-[[:digit:]]+")
+                echo "$imagelist"
+                full_crawler_image_tag=$(echo "$imagelist" | grep crawler | head -n1 | grep -Po "gcr\.io/$gcp_proj_id/[[:alnum:]]+-gcp-[[:digit:]]+-[[:digit:]]+-[[:digit:]]+-[[:digit:]]+-[[:digit:]]+-[[:digit:]]+")
+                echo "$full_crawler_image_tag"
+                full_search_image_tag=$(echo "$imagelist" | grep search | head -n1 | grep -Po "gcr\.io/$gcp_proj_id/[[:alnum:]]+-gcp-[[:digit:]]+-[[:digit:]]+-[[:digit:]]+-[[:digit:]]+-[[:digit:]]+-[[:digit:]]+")
+                echo "$full_search_image_tag"
+                full_ads_image_tag=$(echo "$imagelist" | grep ads | head -n1 | grep -Po "gcr\.io/$gcp_proj_id/[[:alnum:]]+-gcp-[[:digit:]]+-[[:digit:]]+-[[:digit:]]+-[[:digit:]]+-[[:digit:]]+-[[:digit:]]+")
+                echo "$full_ads_image_tag"
+                
+                if [[ "$full_crawler_image_tag" = "" ]]
+                then
+                    echo "[ERROR]: docker has no crawler image tag, please re-run with '--build-containers' option"
+                    exit 1
+
+                elif [[ "$full_search_image_tag" = "" ]]
+                then
+                    echo "[ERROR]: docker has no search image tag, please re-run with '--build-containers' option"
+                    exit 1
+
+                elif [[ "$full_ads_image_tag" = "" ]]
+                then
+                    echo "[ERROR]: docker has no ads image tag, please re-run with '--build-containers' option"
+                    exit 1
+                fi
+
+                crawler_image_build_sha=$(docker images --digests| grep "$full_crawler_image_tag" | grep -Po "sha256.[[:alnum:]]+")
+                search_image_build_sha=$(docker images --digests| grep "$full_search_image_tag" | grep -Po "sha256.[[:alnum:]]+")
+                ads_image_build_sha=$(docker images --digests| grep "$full_ads_image_tag" | grep -Po "sha256.[[:alnum:]]+")
+
+
+        fi
+
+    if [[ "$sync_cluster" = "true" ]]
+    then
         echo "clearing additional bigtable clusters..."
         first_existing_zone=$(grep -n1 "default = \[" tf-gcp/deploymentvars.tf | egrep -v "variable \"gcp_zones\"{|default = \[" | grep -Po "([-[:alnum:]])+" | tail -n1)
         cleardown_list=($(gcloud bigtable clusters list | egrep -v "$first_existing_zone" | grep -Po "$gcp_proj_id-btc-[[:alnum:]-]+"))
@@ -331,9 +401,11 @@ then
         echo "initialising terraform in deployment directory $tfpath"
         cd "$tfpath" && terraform init
 
-        #clear old kubernetes pod definitions
+
+    #clear old kubernetes pod definitions
         echo "" > pods.tf
         echo "" > services.tf
+
 
         echo "attempting initial terraform apply to create cluster, no pods will be deployed this round"
         plan="qsedeployplan_$(deployment_id).out"
@@ -342,7 +414,16 @@ then
         #configure kubectl and run plan + apply again to deploy workload (appears to be a dependency for terraform to deploy k8s pods)
         echo "configuring kubectl to talk to cluster to allow deployment of pods"
         gcloud container clusters get-credentials "$gcp_proj_id-cluster" --region "$gcp_region" --project "$gcp_proj_id"
+    fi
 
+    if [[ "$deploy_pods" = "true" ]]
+    then
+        #setup almost done, initialise terraform in $tfpath and create cluster (will fail on pod creation at this point if not split up)
+        echo "initialising terraform in deployment directory $tfpath"
+        cd "$tfpath" && terraform init
+        #clear old kubernetes pod definitions
+            echo "" > pods.tf
+            echo "" > services.tf
         #write out pod resources now, todo...
             echo "writing pod definitions file..."
             #CRAWLER
@@ -380,7 +461,7 @@ then
             echo "            }" >> pods.tf
             echo "            spec {" >> pods.tf
             echo "                container {" >> pods.tf
-            echo "                    image = \"$crawler_gcr_tag@$crawler_sha\"" >> pods.tf
+            echo "                    image = \"$full_crawler_image_tag@$crawler_image_build_sha\"" >> pods.tf
             echo "                    name  = \"qse-crawler\"" >> pods.tf
             echo "                    resources {" >> pods.tf
             echo "                                limits {" >> pods.tf
@@ -464,7 +545,7 @@ then
             echo "            }" >> pods.tf
             echo "            spec {" >> pods.tf
             echo "                container {" >> pods.tf
-            echo "                    image = \"$search_gcr_tag@$search_sha\"" >> pods.tf
+            echo "                    image = \"$full_search_image_tag@$search_image_build_sha\"" >> pods.tf
             echo "                    name  = \"qse-search\"" >> pods.tf
             echo "                    resources {" >> pods.tf
             echo "                                limits {" >> pods.tf
@@ -605,7 +686,7 @@ then
             echo "            }" >> pods.tf
             echo "            spec {" >> pods.tf
             echo "                container {" >> pods.tf
-            echo "                    image = \"$ads_gcr_tag@$ads_sha\"" >> pods.tf
+            echo "                    image = \"$full_ads_image_tag@$ads_image_build_sha\"" >> pods.tf
             echo "                    name  = \"qse-ads\"" >> pods.tf
             echo "                    resources {" >> pods.tf
             echo "                                limits {" >> pods.tf
@@ -704,6 +785,13 @@ then
 
         echo "attempting final apply to deploy pods as defined in pods.tf file"
         plan="qsedeployplan_$(deployment_id).out"
+
+        if [[ "$sync_cluster" = "true" ]]
+        then
+            echo "waiting for resources to finish deleting after cluster sync..."
+            sleep 60
+        fi
+
         terraform plan -out="$plan" && terraform apply "$plan" && echo "We done, yo. QSE on GCP/GKE deployed."
 
         echo "checking and growing bigtable clusters to match zone spec..."
@@ -719,6 +807,8 @@ then
         else
             echo "no growing was necessary, cluster count matches spec"
         fi
+
+    fi
 
 #finish gcp set up
 

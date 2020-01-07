@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+    <body>
+        <h1>QSE Ads Engine</h1>
+        <form action="/" method="get">
+            Your target url:<br/><input type="text" name="url"><br/>
+            Keywords (comma-separated without spaces, e.g. <i>friendly,honest,services</i>):<br/>
+            <input type="text" name="keywords"><br/>Image URL of the ad that will be displayed:<br/>
+            <input type="text" name="imgurl"><br/><input type="submit" value="Submit QSE Ad">
+        </form>
+        <p>Note: on successful submission the advert will display below this form.</p>
+        <p>Your ad will be displayed on the results page above the search results for queries matching your ad's keywords.</p>
+        <div style="float:left;padding:1%;width=20%">
+            {% for key in ads_payload  %}
+                    <div style="padding:2%;width=20%">
+                        <a href="{{key}}"><img src="{{url_for('static',filename=ads_payload.get(key))}}"></a>
+                    </div>
+            {% endfor %}
+        </div>
+        <div style="float:left;padding:2%;width:80%">
+            <p> example content... </p>
+        </div>
+    </body>
+</html>
