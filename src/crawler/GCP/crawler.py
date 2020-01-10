@@ -7,21 +7,15 @@ import sys
 import os
 from bs4 import BeautifulSoup
 import datetime
-import threading
 from google.cloud import bigtable
-from flask import Fask, request
-from waitress import serve
-
-#webstuff
-app = Flask(__name__)
 
 # storage interface
+initialised = False
 provider = os.environ["QSEPROVIDER"]  # todo -> same as below
 
 # common vars
 common_credentials = None
 common_page_content_column_name = os.environ["COMMON_PAGE_CONTENT_COLUMN_NAME"]
-sync_addresses = []
 
 # gcp vars
 if provider == "GCP":
@@ -35,16 +29,12 @@ if provider == "GCP":
         os.environ["GCP_BIGTABLE_INDEX_TABLE"]
     )
     gcp_bigtable_colfam = os.environ["GCP_BIGTABLE_COLUMN_FAMILY"]
-
-def sync(url, timestamp):
-    for url in sync_addresses:
-        try:
-            subprocess.call([])
-        except:
-            continue
+    initialised = True
 
 
 def write(url, text):
+    #if initialised is False:
+        #initialise()
     if provider == "GCP":
         return write_gcp(url, text)
     else:
@@ -53,85 +43,76 @@ def write(url, text):
 
 def write_gcp(url, text):
     try:
-        timestamp = datetime.datetime.utcnow()
         row_key = url
         row = gcp_bigtable_index_table.row(row_key)
         row.set_cell(
             gcp_bigtable_colfam.encode(),
             common_page_content_column_name.encode(),
             text.encode(),
-            timestamp=timestamp,
+            timestamp=datetime.datetime.utcnow(),
         )
         gcp_bigtable_index_table.mutate_rows([row])
-        sync(url, str(timestamp.timestamp()))
         return True
     except:
+        errstring = str(datetime.datetime.utcnow())+":\t"+str(sys.exc_info())+"\n"
+        f = open("crawler.err.log", "a+")
+        f.write(errstring)
+        f.close()
+        print("ERROR:\t"+errstring)
         return False
 
 
-def rand_ip():
-    # random ip
-    bits = getrandbits(32)
-    addr = IPv4Address(bits)
-    addr_str = str(addr)
-    domain_name = addr_str
+def crawl_random():
     try:
-        domain_name = socket.gethostbyaddr(addr_str)[0]  # reverse dns lookup oneliner
-        return domain_name
-    except:
-        return domain_name
-
-
-def crawl_url(addr_str):
-    # send request
-    req = None
-    prefix = ""
-    if addr_str[:4] != "http":
+        # random ip
+        bits = getrandbits(32)
+        addr = IPv4Address(bits)
+        addr_str = str(addr)
+        print("Attempting: "+addr_str)
+        # send request
+        req = None
         prefix = "https://"
-    try:
         try:
             req = requests.get(f"https://{addr_str}", timeout=10)
         except:
             prefix = "http://"
             req = requests.get(f"http://{addr_str}", timeout=10)
         bs = BeautifulSoup(req.text, "lxml")
-        write(prefix+domain_name, bs.text)
+        domain_name = None
+        try:
+            domain_name = socket.gethostbyaddr(addr_str)[0]  # reverse dns lookup oneliner
+        except:
+            domain_name = addr_str
+        f = open("crawler.storage.log", "a+")
+        f.write(str(datetime.datetime.utcnow())+":\t"+str({prefix+domain_name : bs.text})+"\n")
+        f.close()
+        if write(domain_name, bs.text):
+            print("success"+domain_name)
+        return True
     except:
-        write(prefix+domain_name, "qse-not-available")
+        # should anything at all go wrong - scrap attempt and continue from start ad infinitum
+        errstring = str(datetime.datetime.utcnow())+":\t"+str(sys.exc_info())+"\n"
+        f = open("crawler.err.log", "a+")
+        f.write(errstring)
+        f.close()
+        print("ERROR:\t"+errstring)
+        return False
 
-def query_new():
-    if provider == "GCP":
-        return query_new_gcp()
 
-
-def query_new_gcp():
-    result = None
+def get_status_update():
+    current_state = {}
     for row in gcp_bigtable_index_table.read_rows():
-        pagetext = row.cells[gcp_bigtable_colfam][common_page_content_column_name.encode()][0].value.decode()
-        if pagetext[len(pagetext)-7:] == "qse-new":
-            write(row.row_key,pagetext[:len(pagetext)-7]+"qse-in-progress")
-            result = row.row_key.decode()
-            break
-    return result
+        current_state.update({row.row_key.decode() : row.cells[gcp_bigtable_colfam][common_page_content_column_name.encode()][0].value.decode()})
+    i = 1
+    l = len(current_state)
+    f = open("crawler.success.log", "w+")
+    for item in current_state:
+        f.write(str(i)+"/"+str(l)+":\t"+str(item)+"\n")
+        i = i + 1
+    f.close()
 
-
-def main_loop():
-    q = query_new()
-    if q is not None:
-        crawl_url(q)
-    else:
-        crawl_url(rand_ip)
-
-
-crawler_thread = threading.Thread(target = main_loop , daemon = True)
-
-def run():
-    crawler_thread.start()
-    serve(app,host="0.0.0.0",port=80)
-
-
-if __name__ == "__main__":
-    run()
-
-
+#main loop
+while True:
+    if crawl_random():
+        get_status_update()
 

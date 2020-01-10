@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+    <body>
+        <h1>QSE Search Engine</h1>
+        <form action="/" method="get">
+            <input type="text" name="q">
+            <input type="submit" value="QSE Search">
+        </form>
+        <div style="float:left;padding:2%;width=20%">
+            {% for key in ads_payload  %}
+                    <div style="padding:2%;width=20%">
+                        <a href="{{key}}"><img src="{{url_for('static',filename=ads_payload.get(key))}}"></a>
+                    </div>
+            {% endfor %}
+        </div>
+        <div style="float:left;padding:2%;width=80%">
+            {% for key in results_payload  %}
+                    <div style="padding:2%;width=80%">
+                        <h6><a href="{{key}}">{{key}}</a></h6>
+                        <p>{{results_payload.get(key)}}</p>
+                    </div>
+            {% endfor %}
+        </div>
+    </body>
+</html>
