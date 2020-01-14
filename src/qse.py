@@ -191,7 +191,7 @@ def point_kubectl():
 					for o2 in outputs:
 						print(str(o2.args)+" --> Exit code: "+str(o2.returncode))
 					sys.exit("Error pointing kubectl to k8s cluster, exiting...")
-			print 
+			azure_kubesync_cmd += str(homekube)
 		os.chdir("..")
 
 def deploy():
