@@ -52,6 +52,7 @@ azure_kubesync_cmd = "export KUBECONFIG="
 
 def main():
 	try:
+		azure_kubesync_cmd += ""
 		#configure
 		parse_args()
 		print("Obtained configuration...")
