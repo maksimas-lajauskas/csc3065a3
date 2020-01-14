@@ -1,7 +1,6 @@
 #vars needed:
-var.qse-azure-service-principal-id
-var.qse-azure-service-principal-secret
-
+#var.qse-azure-service-principal-id
+#var.qse-azure-service-principal-secret
 #end vars
 
 provider "azurerm" {}
