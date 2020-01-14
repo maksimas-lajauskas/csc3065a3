@@ -1,0 +1,6 @@
+services: docker
+language: python
+python:
+ - "3.7"
+script:
+ - cd src && python3 qse.py build_containers=true
