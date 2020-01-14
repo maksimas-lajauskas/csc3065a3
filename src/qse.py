@@ -164,7 +164,7 @@ def point_kubectl():
 			outputs.append(subprocess.run(["terraform","output","config_map_aws_auth"],capture_output=True))
 			homekube = os.environ["HOME"]+"/.kube/config"
 			shutil.copyfile(src=homekube,dst=homekube+"_backup_"+uuid().hex)
-			k_cfg = open("homekube","w+")
+			k_cfg = open(homekube,"w+")
 			k_cfg.write(outputs[0].stdout.decode())
 			k_cfg.close()
 			outputs.append(subprocess.run(["aws","eks","update-kubeconfig","--name",k8s_cluster_name],capture_output=True))
@@ -185,7 +185,7 @@ def point_kubectl():
 				shutil.copyfile(src=homekube,dst=homekube+"_backup_"+uuid().hex)
 			except:
 				print("Couldn't copy, writing anyway")
-			k_cfg = open("homekube","w+")
+			k_cfg = open(homekube,"w+")
 			k_cfg.write(outputs[0].stdout.decode())
 			k_cfg.close()
 			for o in outputs:
