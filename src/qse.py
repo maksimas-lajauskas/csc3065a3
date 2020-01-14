@@ -151,7 +151,10 @@ def point_kubectl():
 	if chk_argl(["provider"],["gcp","aws","azure"]):
 		os.chdir("tf-"+cfg["provider"])
 		if chk_arg("provider","gcp"):
-			cmdlist = ["gcloud", "container", "clusters", "get-credentials", cfg["gcp_project_id"]+"-cluster", "--region", cfg["region"], "--project", cfg["gcp_project_id"]]
+			cluster_name = cfg["gcp_project_id"]+"-cluster"
+			reigon = cfg["region"]
+			gcp_project_id = cfg["gcp_project_id"]
+			cmdlist = ["gcloud", "container", "clusters", "get-credentials", cluster_name, "--region", region, "--project", gcp_project_id]
 			cmd = subprocess.run(cmdlist,capture_output=True)
 			if cmd.returncode != 0:
 				sys.exit("Couldn't point kubectl to k8s cluster, exiting...")
