@@ -184,7 +184,7 @@ def point_kubectl():
 			k_cfg = open(homekube,"w+")
 			k_cfg.write(outputs[0].stdout.decode())
 			k_cfg.close()
-			
+			outputs.append(subprocess.run([".././envsetter.sh","KUBECONFIG",str(homekube)],capture_output=True))
 			for o in outputs:
 				if o.returncode != 0:
 					for o2 in outputs:
