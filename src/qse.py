@@ -45,7 +45,7 @@ cfg = {
 }
 
 #constants
-qse_storage_bucket_name = "qse-storage-bucket-40073762-csc3065-assignment_3"
+qse_storage_bucket_name = "qse-storage-bucket-40073762-csc3065-assignment-3"
 docker_repo  = "mlajauskas01/docker-hub:"
 aws_cluster_name  = "qse-eks-cluster"
 
