@@ -268,7 +268,7 @@ def write_tf_defs(can_write_pod_defs=False):
 def define_tf_var(name, value):
 	template = Template("variable $name {\n\tdefault = $value\n}\n")
 	name = "\""+name+"\""
-	if type(value) == type("string") and value[:1] == "\"" and value[-1:] == "\"":
+	if type(value) == type("string") and value[:1] != "\"" and value[-1:] != "\"":
 		value = "\""+value+"\""
 	return template.substitute(name=name,value=value)
 
