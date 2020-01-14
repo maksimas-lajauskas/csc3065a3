@@ -14,7 +14,7 @@ resource "azurerm_resource_group" "qse" {
 }
 
 resource "azurerm_storage_account" "qse" {
-  name                     = "qse-store-acc"
+  name                     = "qsestoreacc"
   resource_group_name      = azurerm_resource_group.qse.name
   location                 = azurerm_resource_group.qse.location
   account_tier             = "Standard"
