@@ -68,8 +68,8 @@ resource "google_container_node_pool" "primary_node_pool" {
 }
 
 resource "google_storage_bucket" "qse-bucket" {
-  name     = "qse-bucket"
+  name     = var.qse_storage_bucket_name
   lifecycle {
-    prevent_destroy = true
+    preve3nt_destroy = true
   }
 }

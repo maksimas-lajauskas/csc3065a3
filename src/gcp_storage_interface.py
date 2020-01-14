@@ -1,6 +1,7 @@
 from google.cloud import storage
 import os
 from uuid import uuid1 as uuid
+from base64 import urlsafe_b64decode
 import json
 import sys
 
@@ -8,7 +9,7 @@ import sys
 keyfile = "keys.json"
 credvar = "GOOGLE_APPLICATION_CREDENTIALS"
 f = open(keyfile,"w+")
-f.write(os.environ[credvar])
+f.write(urlsafe_b64decode(os.environ[credvar][2:-1].encode()).decode())
 f.close()
 os.environ[credvar] = os.path.abspath(keyfile)
 
