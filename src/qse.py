@@ -48,6 +48,7 @@ cfg = {
 qse_storage_bucket_name = "qse-storage-bucket-40073762-csc3065-assignment-3"
 docker_repo  = "mlajauskas01/docker-hub:"
 k8s_cluster_name  = "qse-eks-cluster"
+azure_kubesync_cmd = "export KUBECONFIG="
 
 def main():
 	try:
@@ -70,7 +71,8 @@ def main():
 		if chk_argl(["deploy","create_cluster","full_run"]):
 			deploy() #6
 		print("Done")
-		ok = True
+		if chk_arg("provider","azure"):
+			print("To use kubectl with qse on azure please run the following command:\n"+azure_kubesync_cmd)
 		sys.exit(0)
 	except:
 		if str(sys.exc_info()[1]) != str(SystemExit(0)):
@@ -184,12 +186,12 @@ def point_kubectl():
 			k_cfg = open(homekube,"w+")
 			k_cfg.write(outputs[0].stdout.decode())
 			k_cfg.close()
-			outputs.append(subprocess.run([".././envsetter.sh","KUBECONFIG",str(homekube)],capture_output=True))
 			for o in outputs:
 				if o.returncode != 0:
 					for o2 in outputs:
 						print(str(o2.args)+" --> Exit code: "+str(o2.returncode))
 					sys.exit("Error pointing kubectl to k8s cluster, exiting...")
+			print 
 		os.chdir("..")
 
 def deploy():
