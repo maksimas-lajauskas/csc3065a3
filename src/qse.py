@@ -76,7 +76,7 @@ def main():
 	except:
 		if str(sys.exc_info()[1]) != str(SystemExit(0)):
 			err = sys.exc_info()
-			err[2].print_tb()
+			traceback.print_tb(err[2])
 			sys.exit("ERROR: "+str(err))
 
 
