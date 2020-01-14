@@ -165,6 +165,8 @@ def point_kubectl():
 			outputs.append(run(["kubectl","apply","-f","config_map_aws_auth.yaml"], capture_output = True))
 			for o in outputs:
 				if o.returncode != 0:
+					for o2 in outputs:
+						print(str(o2.args)+" --> Exit code: "+o2.returncode)
 					sys.exit("Error pointing kubectl to k8s cluster, exiting...")
 		if chk_arg("provider","azure"):
 			outputs = []
@@ -176,6 +178,8 @@ def point_kubectl():
 			k_cfg.close()
 			for o in outputs:
 				if o.returncode != 0:
+					for o2 in outputs:
+						print(str(o2.args)+" --> Exit code: "+o2.returncode)
 					sys.exit("Error pointing kubectl to k8s cluster, exiting...")
 		os.chdir("..")
 
