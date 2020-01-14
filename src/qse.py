@@ -157,6 +157,8 @@ def point_kubectl():
 			cmdlist = ["gcloud", "container", "clusters", "get-credentials", cluster_name, "--region", region, "--project", gcp_project_id]
 			cmd = subprocess.run(cmdlist,capture_output=True)
 			if cmd.returncode != 0:
+				for o2 in outputs:
+					print(str(o2.args)+" --> Exit code: "+str(o2.returncode))
 				sys.exit("Couldn't point kubectl to k8s cluster, exiting...")
 		if chk_arg("provider","aws"):
 			outputs = []
