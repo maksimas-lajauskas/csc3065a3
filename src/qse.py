@@ -164,7 +164,6 @@ def point_kubectl():
 			cmaa = open("config_map_aws_auth.yaml","w+")
 			cmaa.write(outputs[1].stdout.decode())
 			cmaa.close()
-
 			outputs.append(run(["kubectl","apply","-f","config_map_aws_auth.yaml"], capture_output = True))
 			for o in outputs:
 				if o.returncode != 0:##awsclipontktcl
