@@ -48,7 +48,7 @@ cfg = {
 #constants
 qse_storage_bucket_name = "qse-storage-bucket-40073762-csc3065-assignment-3"
 docker_repo  = "mlajauskas01/docker-hub:"
-aws_cluster_name  = "qse-eks-cluster"
+k8s_cluster_name  = "qse-eks-cluster"
 
 def main():
 	try:
@@ -167,7 +167,7 @@ def point_kubectl():
 			k_cfg = open("homekube","w+")
 			k_cfg.write(outputs[0].stdout.decode())
 			k_cfg.close()
-			outputs.append(subprocess.run(["aws","eks","update-kubeconfig","--name",aws_cluster_name],capture_output=True))
+			outputs.append(subprocess.run(["aws","eks","update-kubeconfig","--name",k8s_cluster_name],capture_output=True))
 			cmaa = open("config_map_aws_auth.yaml","w+")
 			cmaa.write(outputs[1].stdout.decode())
 			cmaa.close()
@@ -204,6 +204,7 @@ def write_tf_defs(can_write_pod_defs=False):
 		pod_env_vars = []
 		varstring = ""
 		os.chdir("tf-"+cfg["provider"])
+		varstring += define_tf_var("cluster-name",k8s_cluster_name)
 		varstring += define_tf_var("region",cfg["region"])
 		varstring += define_tf_var("qse_storage_bucket_name",qse_storage_bucket_name)
 		if chk_arg("provider","gcp"):
@@ -220,11 +221,8 @@ def write_tf_defs(can_write_pod_defs=False):
 				creds = open(os.path.abspath(cfg["gcp_service_account_json"]),"r")
 				pod_env_vars.append(("GOOGLE_APPLICATION_CREDENTIALS",str(urlsafe_b64encode(creds.read().encode()))))#gcp creds
 				creds.close()
-				pod_env_vars.append(("QSE_STORAGE_BUCKET_NAME",qse_storage_bucket_name))#storage bucket name
-				pod_env_vars.append(("QSEPROVIDER",cfg["provider"].upper()))#provider
 		elif chk_arg("provider","aws"):
 			varstring += define_tf_var("deploying_machine_public_ip",requests.get("https://ipv4.icanhazip.com/").text[:-2])
-			varstring += define_tf_var("cluster-name",aws_cluster_name)
 			if can_write_pod_defs:
 				pod_env_vars.append(("aws_access_key_id",cfg["aws_access_key_id"]))
 				pod_env_vars.append(("aws_secret_access_key",cfg["aws_secret_access_key"]))
@@ -243,6 +241,8 @@ def write_tf_defs(can_write_pod_defs=False):
 	deploymentvars_tf.close()
 	#pods.tf
 	if can_write_pod_defs:
+		pod_env_vars.append(("QSE_STORAGE_BUCKET_NAME",qse_storage_bucket_name))#storage bucket name
+		pod_env_vars.append(("QSEPROVIDER",cfg["provider"].upper()))#provider
 		pods_tf = open("pods.tf", "w+")
 			#write defs
 		for pod in ["crawler","search","ads"]:
