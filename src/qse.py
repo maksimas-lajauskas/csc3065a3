@@ -181,7 +181,10 @@ def point_kubectl():
 			outputs = []
 			outputs.append(subprocess.run(["terraform","output","kube_config"],capture_output=True))
 			homekube = os.environ["HOME"]+"/.kube/config"
-			shutil.copyfile(src=homekube,dst=homekube+"_backup_"+uuid().hex)
+			try:
+				shutil.copyfile(src=homekube,dst=homekube+"_backup_"+uuid().hex)
+			except:
+				print("Couldn't copy, writing anyway")
 			k_cfg = open("homekube","w+")
 			k_cfg.write(outputs[0].stdout.decode())
 			k_cfg.close()
