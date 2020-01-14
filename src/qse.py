@@ -48,11 +48,10 @@ cfg = {
 qse_storage_bucket_name = "qse-storage-bucket-40073762-csc3065-assignment-3"
 docker_repo  = "mlajauskas01/docker-hub:"
 k8s_cluster_name  = "qse-eks-cluster"
-azure_kubesync_cmd = "export KUBECONFIG="
+azure_kubesync_cmd = ""
 
 def main():
 	try:
-		azure_kubesync_cmd += ""
 		#configure
 		parse_args()
 		print("Obtained configuration...")
@@ -192,7 +191,7 @@ def point_kubectl():
 					for o2 in outputs:
 						print(str(o2.args)+" --> Exit code: "+str(o2.returncode))
 					sys.exit("Error pointing kubectl to k8s cluster, exiting...")
-			azure_kubesync_cmd = azure_kubesync_cmd + str(homekube)
+			azure_kubesync_cmd = "export KUBECONFIG=" + str(homekube)
 		os.chdir("..")
 
 def deploy():
