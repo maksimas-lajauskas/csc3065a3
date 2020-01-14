@@ -180,16 +180,11 @@ def point_kubectl():
 		if chk_arg("provider","azure"):
 			outputs = []
 			outputs.append(subprocess.run(["terraform","output","kube_config"],capture_output=True))
-			homekube = os.environ["HOME"]+"/.kube/config"
-			try:
-				shutil.copyfile(src=homekube,dst=homekube+"_backup_"+uuid().hex)
-			except:
-				os.mkdir(os.environ["HOME"]+"/.kube")
-				shutil.copyfile(src=homekube,dst=homekube+"_backup_"+uuid().hex)
-				print("Couldn't copy, writing anyway")
+			homekube = os.environ["HOME"]+"/.kube_config"
 			k_cfg = open(homekube,"w+")
 			k_cfg.write(outputs[0].stdout.decode())
 			k_cfg.close()
+			
 			for o in outputs:
 				if o.returncode != 0:
 					for o2 in outputs:
