@@ -47,6 +47,7 @@ cfg = {
 #constants
 qse_storage_bucket_name = "qse-storage-bucket-40073762-csc3065-assignment_3"
 docker_repo  = "mlajauskas01/docker-hub:"
+aws_cluster_name  = "qse-eks-cluster"
 
 def main():
 	try:
@@ -159,12 +160,14 @@ def point_kubectl():
 			k_cfg = open("homekube","w+")
 			k_cfg.write(outputs[0].stdout.decode())
 			k_cfg.close()
+			outputs.append(run(["aws","eks","update-kubeconfig","--name",aws_cluster_name], capture_output = True))
 			cmaa = open("config_map_aws_auth.yaml","w+")
 			cmaa.write(outputs[1].stdout.decode())
 			cmaa.close()
+
 			outputs.append(run(["kubectl","apply","-f","config_map_aws_auth.yaml"], capture_output = True))
 			for o in outputs:
-				if o.returncode != 0:
+				if o.returncode != 0:##awsclipontktcl
 					for o2 in outputs:
 						print(str(o2.args)+" --> Exit code: "+str(o2.returncode))
 					sys.exit("Error pointing kubectl to k8s cluster, exiting...")
@@ -215,6 +218,7 @@ def write_tf_defs(can_write_pod_defs=False):
 				pod_env_vars.append(("QSEPROVIDER",cfg["provider"].upper()))#provider
 		elif chk_arg("provider","aws"):
 			varstring += define_tf_var("deploying_machine_public_ip",requests.get("https://ipv4.icanhazip.com/").text[:-2])
+			varstring += define_tf_var("cluster-name",aws_cluster_name)
 			if can_write_pod_defs:
 				pod_env_vars.append(("aws_access_key_id",cfg["aws_access_key_id"]))
 				pod_env_vars.append(("aws_secret_access_key",cfg["aws_secret_access_key"]))
