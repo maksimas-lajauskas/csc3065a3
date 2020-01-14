@@ -268,7 +268,7 @@ def write_tf_defs(can_write_pod_defs=False):
 def define_tf_var(name, value):
 	template = Template("variable $name {\n\tdefault = $value\n}\n")
 	name = "\""+name+"\""
-	if type(value) == type("string"):
+	if type(value) == type("string") and value[:1] == "\"" and value[-1:] == "\"":
 		value = "\""+value+"\""
 	return template.substitute(name=name,value=value)
 
@@ -279,7 +279,7 @@ def define_k8s_deployment(app_name, image, env_vars = [], target_replicas = None
 		max_replicas = target_replicas + 1
 	i = 0
 	for pair in env_vars:
-		if pair[1].find(".") < 0 and type(pair[1]) == type("string"):
+		if pair[1].find(".") < 0 and type(pair[1]) == type("string") and pair[1][:1] == "\"" and pair[1][-1:] == "\"":
 			env_vars[i] = (pair[0],"\""+pair[1]+"\"")
 		i += 1
 	env_template = Template("""\n\t\t\t\t\tenv {\n\t\t\t\t\t\tname = "$env_name"\n\t\t\t\t\t\tvalue = $env_value\n\t\t\t\t\t}\n""")
