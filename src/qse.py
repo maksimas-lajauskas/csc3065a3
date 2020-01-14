@@ -239,7 +239,7 @@ def write_tf_defs(can_write_pod_defs=False):
 			if can_write_pod_defs:
 				pod_env_vars.append(("AZURE_TENANT_ID",cfg["azure_service_tenant_id"]))
 				pod_env_vars.append(("AZURE_CLIENT_ID",cfg["azure_service_principal_id"]))
-				pod_env_vars.append(("AZURE_CLIENT_SECRET","\""+cfg["azure_service_principal_secret"]+"\""))
+				pod_env_vars.append(("AZURE_CLIENT_SECRET",cfg["azure_service_principal_secret"]))
 				pod_env_vars.append(("QSE_STORAGE_BUCKET_NAME",qse_storage_bucket_name))#storage bucket name
 	else:
 		sys.exit("Uknown provider")
