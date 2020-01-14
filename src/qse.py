@@ -1,5 +1,5 @@
 import os
-from subprocess import run
+import subprocess
 import sys
 import datetime
 import shutil
@@ -121,10 +121,10 @@ def help_text():
 
 def build_containers():
 	print("start container build...")
-	login = run(["docker","login"]).returncode
+	login = subprocess.run(["docker","login"]).returncode
 	if login != 0:
 		sys.exit("Bad login, exiting...")
-	ps = run(["ps","-e"], capture_output = True)
+	ps = subprocess.run(["ps","-e"],capture_output=True)
 	print("check - dockerd running..?")
 	if int(ps.stdout.decode().find("dockerd")) < 0:
 		sys.exit("Error: docker daemon not running. Start daemon and re-run script. Exiting...")
@@ -135,12 +135,12 @@ def build_containers():
 		for provider in ["aws","gcp","azure"]:
 			filename = provider+"_storage_interface.py"
 			shutil.copyfile(src=filename,dst=module_name+"/"+filename)
-		outputs.append(run(["docker","build","-t",module_name, module_name], capture_output = True))
+		outputs.append(subprocess.run(["docker","build","-t",module_name, module_name],capture_output=True))
 	#tag & push containers as :latest version
 	print("pushing images (may take some time depending on upload speed)...")
 	for module_name in ["crawler","ads","search"]:
-		outputs.append(run(["docker","tag", module_name+":latest", docker_repo+module_name], capture_output = True))
-		outputs.append(run(["docker","push", docker_repo+module_name], capture_output = True))
+		outputs.append(subprocess.run(["docker","tag", module_name+":latest", docker_repo+module_name],capture_output=True))
+		outputs.append(subprocess.run(["docker","push", docker_repo+module_name],capture_output=True))
 	for output in outputs:
 		if output.returncode != 0:
 			for o in outputs:
@@ -151,23 +151,24 @@ def point_kubectl():
 	if chk_argl(["provider"],["gcp","aws","azure"]):
 		os.chdir("tf-"+cfg["provider"])
 		if chk_arg("provider","gcp"):
-			cmd = run(["gcloud", "container", "clusters", "get-credentials", cfg["gcp_project_id"]+"-cluster", "--region", cfg["region"], "--project", cfg["gcp_project_id"]], capture_output = True)
+			cmdlist = ["gcloud", "container", "clusters", "get-credentials", cfg["gcp_project_id"]+"-cluster", "--region", cfg["region"], "--project", cfg["gcp_project_id"]]
+			cmd = subprocess.run(cmdlist,capture_output=True)
 			if cmd.returncode != 0:
 				sys.exit("Couldn't point kubectl to k8s cluster, exiting...")
 		if chk_arg("provider","aws"):
 			outputs = []
-			outputs.append(run(["terraform","output","kubeconfig"], capture_output = True))
-			outputs.append(run(["terraform","output","config_map_aws_auth"], capture_output = True))
+			outputs.append(subprocess.run(["terraform","output","kubeconfig"],capture_output=True))
+			outputs.append(subprocess.run(["terraform","output","config_map_aws_auth"],capture_output=True))
 			homekube = os.environ["HOME"]+"/.kube/config"
 			shutil.copyfile(src=homekube,dst=homekube+"_backup_"+uuid().hex)
 			k_cfg = open("homekube","w+")
 			k_cfg.write(outputs[0].stdout.decode())
 			k_cfg.close()
-			outputs.append(run(["aws","eks","update-kubeconfig","--name",aws_cluster_name], capture_output = True))
+			outputs.append(subprocess.run(["aws","eks","update-kubeconfig","--name",aws_cluster_name],capture_output=True))
 			cmaa = open("config_map_aws_auth.yaml","w+")
 			cmaa.write(outputs[1].stdout.decode())
 			cmaa.close()
-			outputs.append(run(["kubectl","apply","-f","config_map_aws_auth.yaml"], capture_output = True))
+			outputs.append(subprocess.run(["kubectl","apply","-f","config_map_aws_auth.yaml"],capture_output=True))
 			for o in outputs:
 				if o.returncode != 0:##awsclipontktcl
 					for o2 in outputs:
@@ -175,7 +176,7 @@ def point_kubectl():
 					sys.exit("Error pointing kubectl to k8s cluster, exiting...")
 		if chk_arg("provider","azure"):
 			outputs = []
-			outputs.append(run(["terraform","output","kube_config"], capture_output = True))
+			outputs.append(subprocess.run(["terraform","output","kube_config"],capture_output=True))
 			homekube = os.environ["HOME"]+"/.kube/config"
 			shutil.copyfile(src=homekube,dst=homekube+"_backup_"+uuid().hex)
 			k_cfg = open("homekube","w+")
@@ -191,8 +192,8 @@ def point_kubectl():
 def deploy():
 	if chk_argl(["provider"],["gcp","aws","azure"]):
 		os.chdir("tf-"+cfg["provider"])
-		run(["terraform","init"])
-		run(["terraform","apply","-auto-approve"])
+		subprocess.run(["terraform","init"])
+		subprocess.run(["terraform","apply","-auto-approve"])
 		os.chdir("..")
 
 def write_tf_defs(can_write_pod_defs=False):
