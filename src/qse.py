@@ -237,7 +237,7 @@ def write_tf_defs(can_write_pod_defs=False):
 			varstring += define_tf_var("qse-azure-service-principal-id",cfg["azure_service_principal_id"])
 			varstring += define_tf_var("qse-azure-service-principal-secret",cfg["azure_service_principal_secret"])
 			if can_write_pod_defs:
-				pod_env_vars.append(("AZURE_TENANT_ID",cfg["azure_service_tenant_id1"]))
+				pod_env_vars.append(("AZURE_TENANT_ID",cfg["azure_service_tenant_id"]))
 				pod_env_vars.append(("AZURE_CLIENT_ID",cfg["azure_service_principal_id"]))
 				pod_env_vars.append(("AZURE_CLIENT_SECRET",cfg["azure_service_principal_secret"]))
 				pod_env_vars.append(("QSE_STORAGE_BUCKET_NAME","${aws_s3_bucket.qse_s3_bucket.bucket_domain_name}"))#storage bucket name
