@@ -3,7 +3,6 @@ import subprocess
 import sys
 import datetime
 import shutil
-import requests
 import traceback
 from uuid import uuid1 as uuid
 from string import Template
@@ -224,6 +223,7 @@ def write_tf_defs(can_write_pod_defs=False):
 				pod_env_vars.append(("QSE_STORAGE_BUCKET_NAME",qse_storage_bucket_name))#storage bucket name
 				creds.close()
 		elif chk_arg("provider","aws"):
+			import requests
 			varstring += define_tf_var("deploying_machine_public_ip",requests.get("https://ipv4.icanhazip.com/").text[:-2])
 			if can_write_pod_defs:
 				pod_env_vars.append(("aws_access_key_id",cfg["aws_access_key_id"]))
