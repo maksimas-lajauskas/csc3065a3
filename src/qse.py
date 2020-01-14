@@ -279,7 +279,7 @@ def define_k8s_deployment(app_name, image, env_vars = [], target_replicas = None
 		max_replicas = target_replicas + 1
 	i = 0
 	for pair in env_vars:
-		if pair[1].find(".") < 0 and type(pair[1]) == type("string") and pair[1][:1]+pair[1][-1:] != "\"\"":
+		if pair[1].find(".") < 0 and type(pair[1]) == type("string"):
 			env_vars[i] = (pair[0],"\""+pair[1]+"\"")
 		i += 1
 	env_template = Template("""\n\t\t\t\t\tenv {\n\t\t\t\t\t\tname = "$env_name"\n\t\t\t\t\t\tvalue = $env_value\n\t\t\t\t\t}\n""")
