@@ -31,6 +31,7 @@ cfg = {
 	"force_write_pod_defs": None,
 	"deploy" : None,
 	"point_kubectl" : None,
+	"skip_docker_build" : None,
 	#argsvars - gcp
 	"gcp_service_account_json" : None,
 	"gcp_project_id" : None,
@@ -44,7 +45,7 @@ cfg = {
 }
 
 #constants
-qse_storage_bucket_name = "40073762_QSE_STORAGE_BUCKET_CSC3065_ASSIGNMENT_3"
+qse_storage_bucket_name = "qse-storage-bucket-40073762-csc3065-assignment_3"
 docker_repo  = "mlajauskas01/docker-hub:"
 
 def main():
@@ -55,7 +56,7 @@ def main():
 		for c in str(cfg).replace("{","").replace("}","").split(", "):
 			print(c)
 		#run
-		if chk_argl(["build_containers","full_run"]):
+		if chk_argl(["build_containers","full_run"]) and not chk_arg("skip_docker_build"):
 			build_containers() #1
 		if chk_argl(["write_tf_defs","full_run","create_cluster"]):
 			write_tf_defs(chk_arg("force_write_pod_defs")) #2
@@ -121,7 +122,7 @@ def build_containers():
 		sys.exit("Bad login, exiting...")
 	ps = run(["ps","-e"], capture_output = True)
 	print("check - dockerd running..?")
-	if ps.stdout.decode().find("dockerd") != 0:
+	if int(ps.stdout.decode().find("dockerd")) < 0:
 		sys.exit("Error: docker daemon not running. Start daemon and re-run script. Exiting...")
 	#build_containers
 	print("building images (may take a few minutes)...")
@@ -132,8 +133,8 @@ def build_containers():
 			shutil.copyfile(src=filename,dst=module_name+"/"+filename)
 		outputs.append(run(["docker","build","-t",module_name, module_name], capture_output = True))
 	#tag & push containers as :latest version
-	print("building images (may take some time depending on upload speed)...")
-	for module_name in containers:
+	print("pushing images (may take some time depending on upload speed)...")
+	for module_name in ["crawler","ads","search"]:
 		outputs.append(run(["docker","tag", module_name+":latest", docker_repo+module_name], capture_output = True))
 		outputs.append(run(["docker","push", docker_repo+module_name], capture_output = True))
 	for output in outputs:
@@ -146,7 +147,7 @@ def point_kubectl():
 	if chk_argl(["provider"],["gcp","aws","azure"]):
 		os.chdir("tf-"+cfg["provider"])
 		if chk_arg("provider","gcp"):
-			cmd = run(["gcloud", "container", "clusters", "get-credentials", cfg[gcp_project_id]+"-cluster", "--region", cfg["region"], "--project", cfg[gcp_project_id]], capture_output = True)
+			cmd = run(["gcloud", "container", "clusters", "get-credentials", cfg["gcp_project_id"]+"-cluster", "--region", cfg["region"], "--project", cfg["gcp_project_id"]], capture_output = True)
 			if cmd.returncode != 0:
 				sys.exit("Couldn't point kubectl to k8s cluster, exiting...")
 		if chk_arg("provider","aws"):
@@ -194,6 +195,12 @@ def write_tf_defs(can_write_pod_defs=False):
 		varstring += define_tf_var("qse_storage_bucket_name",qse_storage_bucket_name)
 		if chk_arg("provider","gcp"):
 			#deploymentvars.tf for running terraform
+			if chk_arg("provider","gcp"):
+				ogpath = os.path.abspath(cfg["gcp_service_account_json"])
+				newpath = cfg["gcp_service_account_json"].split("/")[-1:][0]
+				print("NEWPATH: " + newpath)
+				shutil.copyfile(src=ogpath,dst=newpath)
+				cfg["gcp_service_account_json"] = newpath
 			varstring += define_tf_var("gcp_proj_id",cfg["gcp_project_id"])
 			varstring += define_tf_var("gcp_key_json",os.path.abspath(cfg["gcp_service_account_json"]))
 			if can_write_pod_defs:
