@@ -1,24 +1,20 @@
-from google.cloud import storage
+from azure.identity import DefaultAzureCredential
+from azure.storage.blob import BlobServiceClient
 import os
 from uuid import uuid1 as uuid
 import json
 import sys
 
 #init environment
-keyfile = "keys.json"
-credvar = "GOOGLE_APPLICATION_CREDENTIALS"
-f = open(keyfile,"w+")
-f.write(os.environ[credvar])
-f.close()
-os.environ[credvar] = os.path.abspath(keyfile)
-
+token_credential = DefaultAzureCredential()
+storage_client = BlobServiceClient(account_url="https://"+accountname+".blob.core.windows.net", credential=token_credential)
 bucketname = os.environ["QSE_STORAGE_BUCKET_NAME"]
-storage_client = storage.Client()
-bucket = storage_client.bucket(bucketname)
+accountname = os.environ["azure_storage_account_name"]
+bucket = storage_client.get_container_client(bucketname)
 
 def blob_to_string(blob):
 	try:
-		return blob.download_as_string().decode()
+		return blob.download_blob().readall().decode()
 	except:
 		print(sys.exc_info())
 		return None
@@ -26,7 +22,8 @@ def blob_to_string(blob):
 def locate_blob_prefix(prefix):
 	for blob in bucket.list_blobs():
 		try:
-			j = json.loads(blob_to_string(blob))
+			bc = bucket.get_blob_client(blob["name"])
+			j = json.loads(blob_to_string(bc))
 			if j["header"][:len(prefix)] == prefix:
 				return blob
 		except:
@@ -36,28 +33,32 @@ def locate_blob_prefix(prefix):
 def delete_blob(header):
 	for blob in bucket.list_blobs():
 		try:
-			j = json.loads(blob_to_string(blob))
+			bc = bucket.get_blob_client(blob["name"])
+			j = json.loads(blob_to_string(bc))
 			if j["header"] == header:
-				blob.delete()
+				bc.delete_blob()
 		except:
 			continue
 
 def locate_blob_exact(header):
 	for blob in bucket.list_blobs():
 		try:
-			j = json.loads(blob_to_string(blob))
+			bc = bucket.get_blob_client(blob["name"])
+			j = json.loads(blob_to_string(bc))
 			if j["header"] == header:
 				return blob
 		except:
 			continue
 	return None
 
+#gcp variant should use "img_bytes" for referencing actual image's bytes' blob name, aws object ==> object key, azure ==> blob name
 def ads_query(query_string):
 	results = {}
 	query_string_tokenised = query_string.split(" ")
 	for blob in bucket.list_blobs():
 		try:
-			j = json.loads(blob_to_string(blob))
+			bc = bucket.get_blob_client(blob["name"])
+			j = json.loads(blob_to_string(bc))
 			if j["header"][:7] == "advert-":
 				matchscore = 0
 				for i in query_string_tokenised:
@@ -69,7 +70,7 @@ def ads_query(query_string):
 					results[j["data"]["url"]] = {"img_height" : j["data"]["img_height"],
 					"img_width": j["data"]["img_width"],
 					"img_mode": j["data"]["img_mode"],
-					"img_bytes": bucket.blob(j["data"]["img_bytes"]).download_as_string()}
+					"img_bytes": bucket.get_blob_client(j["data"]["img_bytes"]).download_blob().readall()} # <-- test fetching blob directly from bucket outside of foreach
 		except:
 			print(sys.exc_info())
 			continue
@@ -80,7 +81,8 @@ def search_query(query_string):
 	query_string_tokenised = query_string.split(" ")
 	for blob in bucket.list_blobs():
 		try:
-			j = json.loads(blob_to_string(blob))
+			bc = bucket.get_blob_client(blob["name"])
+			j = json.loads(blob_to_string(bc))
 			if j["header"][:8] == "webpage-":
 				matchscore = 0
 				for i in query_string_tokenised:
@@ -102,9 +104,9 @@ def write(data, header=None): #assumes data (containing redundant header) == byt
 	if header is not None:
 		blob = locate_blob_exact(header)
 	if blob is None:
-		blob = bucket.blob(uuid().hex)
-	blob.upload_from_string(data)
-	return blob.name
+		blob = bucket.get_blob_client(uuid().hex)
+	blob.upload_blob(data)
+	return blob.blob_name
 #datamodel: advert = {"header": "advert-<...>", "data": {"url": "<...>", "keywords": "<...>", "img_bytes": "<header of image bytes blob>", "img_height": "<...>", "img_width": "<...>", "img_mode": "<...>"}, "timestamp": "<...>" }
 #datamodel: webpage = {"header": "webpage-<url>", "data": {"url": "<...>", "pagetext": "<...>"}, "timestamp": "<...>" }
 #datamodel: ticket = {"header": "ticket-<url>", "data": "<url>", "timestamp": "<...>" }

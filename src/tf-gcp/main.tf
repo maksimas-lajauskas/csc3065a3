@@ -1,16 +1,21 @@
 //Configure Google Cloud Platform
 
+#needs vars:
+#gcp_key_json
+#gcp_proj_id
+#region
+
 provider "google"{
   credentials = file(var.gcp_key_json)
   project = var.gcp_proj_id
-  region = var.gcp_region
+  region = var.region
 }
 
 provider "kubernetes" {}
 
 resource "google_container_cluster" "primary" {
     name = "${var.gcp_proj_id}-cluster"
-    location = var.gcp_region
+    location = var.region
     remove_default_node_pool = true
     initial_node_count = 1
     ip_allocation_policy {}
@@ -26,7 +31,7 @@ resource "google_container_cluster" "primary" {
 
 resource "google_container_node_pool" "primary_node_pool" {
     name = "${var.gcp_proj_id}-pool"
-    location = var.gcp_region
+    location = var.region
     cluster = google_container_cluster.primary.name
     node_count = 1
 
@@ -56,34 +61,15 @@ resource "google_container_node_pool" "primary_node_pool" {
         update = "40m"
     }
 
+    lifecycle {
+      create_before_destroy = true
+    }
+
 }
 
-resource "google_bigtable_instance" "qse-bigtable" {
-  name = var.gcp_bigtable_instance
-  project =  var.gcp_proj_id
-  cluster {
-    cluster_id   = "${var.gcp_proj_id}-btc-${var.gcp_zones[0]}"
-    zone         = var.gcp_zones[0]
-    num_nodes    = 3
-    storage_type = "HDD"
+resource "google_storage_bucket" "qse-bucket" {
+  name     = "qse-bucket"
+  lifecycle {
+    prevent_destroy = true
   }
 }
-
-resource "google_bigtable_table" "qse-index" {
-  name = var.gcp_bigtable_index_table
-  project =  var.gcp_proj_id
-  instance_name = google_bigtable_instance.qse-bigtable.name
-  column_family {
-    family = "index"
-  }
-}
-
-resource "google_bigtable_table" "qse-ads" {
-  name = var.gcp_bigtable_ads_table
-  project =  var.gcp_proj_id
-  instance_name = google_bigtable_instance.qse-bigtable.name
-  column_family {
-    family = "ads"
-  }
-}
-

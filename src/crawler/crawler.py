@@ -8,8 +8,7 @@ import os
 from bs4 import BeautifulSoup
 import datetime
 import threading
-from google.cloud import bigtable
-from flask import Fask, request
+from flask import Flask, request
 from waitress import serve
 
 #webstuff
@@ -18,55 +17,30 @@ app = Flask(__name__)
 # storage interface
 provider = os.environ["QSEPROVIDER"]  # todo -> same as below
 
-# common vars
-common_credentials = None
-common_page_content_column_name = os.environ["COMMON_PAGE_CONTENT_COLUMN_NAME"]
-sync_addresses = []
-
-# gcp vars
-if provider == "GCP":
-    gcp_project_id = os.environ["GCP_PROJECT_ID"]
-    common_credentials = os.environ["GOOGLE_APPLICATION_CREDENTIALS"]
-    gcp_bigtable_client = bigtable.Client.from_service_account_json(
-        json_credentials_path=common_credentials, admin=True
-    )
-    gcp_bigtable_instance = gcp_bigtable_client.instance(os.environ["GCP_BIGTABLE_INSTANCE"])
-    gcp_bigtable_index_table = gcp_bigtable_instance.table(
-        os.environ["GCP_BIGTABLE_INDEX_TABLE"]
-    )
-    gcp_bigtable_colfam = os.environ["GCP_BIGTABLE_COLUMN_FAMILY"]
-
-def sync(url, timestamp):
-    for url in sync_addresses:
-        try:
-            subprocess.call([])
-        except:
-            continue
-
-
-def write(url, text):
-    if provider == "GCP":
-        return write_gcp(url, text)
-    else:
-        return False
-
-
-def write_gcp(url, text):
-    try:
-        timestamp = datetime.datetime.utcnow()
-        row_key = url
-        row = gcp_bigtable_index_table.row(row_key)
-        row.set_cell(
-            gcp_bigtable_colfam.encode(),
-            common_page_content_column_name.encode(),
-            text.encode(),
-            timestamp=timestamp,
-        )
-        gcp_bigtable_index_table.mutate_rows([row])
-        sync(url, str(timestamp.timestamp()))
-        return True
-    except:
-        return False
+if os.environ["QSEPROVIDER"] == "GCP":
+    import gcp_storage_interface
+    from gcp_storage_interface import write
+    from gcp_storage_interface import locate_blob_prefix
+    from gcp_storage_interface import delete_blob
+    from gcp_storage_interface import locate_blob_exact
+    from gcp_storage_interface import ads_query
+    from gcp_storage_interface import search_query
+elif os.environ["QSEPROVIDER"] == "AWS":
+    import aws_storage_interface
+    from aws_storage_interface import write
+    from aws_storage_interface import locate_blob_prefix
+    from aws_storage_interface import delete_blob
+    from aws_storage_interface import locate_blob_exact
+    from aws_storage_interface import ads_query
+    from aws_storage_interface import search_query
+elif os.environ["QSEPROVIDER"] == "AZURE":
+    import azure_storage_interface
+    from azure_storage_interface import write
+    from azure_storage_interface import locate_blob_prefix
+    from azure_storage_interface import delete_blob
+    from azure_storage_interface import locate_blob_exact
+    from azure_storage_interface import ads_query
+    from azure_storage_interface import search_query
 
 
 def rand_ip():
@@ -86,6 +60,7 @@ def crawl_url(addr_str):
     # send request
     req = None
     prefix = ""
+    entry = {"header": f"webpage-{prefix+domain_name}", "data": {"url": prefix+domain_name, "pagetext": "qse-not-available"}, "timestamp": str(datetime.datetime.utcnow().timestamp()) }
     if addr_str[:4] != "http":
         prefix = "https://"
     try:
@@ -95,30 +70,18 @@ def crawl_url(addr_str):
             prefix = "http://"
             req = requests.get(f"http://{addr_str}", timeout=10)
         bs = BeautifulSoup(req.text, "lxml")
-        write(prefix+domain_name, bs.text)
+        entry["data"]["pagetext"] = bs.text
+        write(header = entry["header"],data = json.dumps(entry).encode())
     except:
-        write(prefix+domain_name, "qse-not-available")
-
-def query_new():
-    if provider == "GCP":
-        return query_new_gcp()
-
-
-def query_new_gcp():
-    result = None
-    for row in gcp_bigtable_index_table.read_rows():
-        pagetext = row.cells[gcp_bigtable_colfam][common_page_content_column_name.encode()][0].value.decode()
-        if pagetext[len(pagetext)-7:] == "qse-new":
-            write(row.row_key,pagetext[:len(pagetext)-7]+"qse-in-progress")
-            result = row.row_key.decode()
-            break
-    return result
+        write(header = entry["header"],data = json.dumps(entry).encode())
 
 
 def main_loop():
-    q = query_new()
+    q = locate_blob_prefix("ticket-")
     if q is not None:
-        crawl_url(q)
+        ticket = json.loads(blob_to_string(q))
+        delete_blob(q)
+        crawl_url(ticket["data"])
     else:
         crawl_url(rand_ip)
 

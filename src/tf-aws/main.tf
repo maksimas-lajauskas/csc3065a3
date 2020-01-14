@@ -1,19 +1,3 @@
-provider "aws" {
-    region = var.region
-}
-
-variable "region" {
-    default = "us-east-1"
-}
-
-variable "access-key-id" {
-    default = "AKIAXH2VX4IRLUWDBU7D"
-}
-
-variable "secret-access-key" {
-    default = "0yq9p1ZKHrc7TUpzasGYTmy+PBWSR8dPD7VnlDCA"
-}
-
 variable "cluster-name" {
   default = "terraform-eks-demo"
   type    = string
@@ -79,7 +63,7 @@ resource "aws_iam_role" "demo-node" {
     {
       "Effect": "Allow",
       "Principal": {
-        "Service": "eks.amazonaws.com"
+        "Service": ["eks.amazonaws.com","ec2.amazonaws.com"]
       },
       "Action": "sts:AssumeRole"
     }
@@ -109,7 +93,7 @@ resource "aws_security_group" "demo-cluster" {
 #           to the Kubernetes. You will need to replace A.B.C.D below with
 #           your real IP. Services like icanhazip.com can help you find this.
 resource "aws_security_group_rule" "demo-cluster-ingress-workstation-https" {
-  cidr_blocks       = ["86.100.137.252/32"]
+  cidr_blocks       = ["13.53.32.74/32"]
   description       = "Allow workstation to communicate with the cluster API Server"
   from_port         = 443
  protocol          = "tcp"
@@ -182,6 +166,21 @@ resource "aws_security_group" "demo-node" {
   }
 }
 
+resource "aws_iam_role_policy_attachment" "demo-node-AmazonEKSWorkerNodePolicy" {
+	policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+	role = aws_iam_role.demo-node.name
+}
+
+resource "aws_iam_role_policy_attachment" "demo-node-AmazonEKS_CNI_Policy" {
+	policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+	role = aws_iam_role.demo-node.name
+}
+
+resource "aws_iam_role_policy_attachment" "demo-node-AmazonEC2ContainerRegistryReadOnly" {
+	policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+	role = aws_iam_role.demo-node.name
+}
+
 resource "aws_security_group_rule" "demo-node-ingress-self" {
   description              = "Allow node to communicate with each other"
   from_port                = 0
@@ -241,22 +240,16 @@ USERDATA
 
 }
 
-data "aws_iam_instance_profile" "crawler" {
-  name = "crawler"
+resource "aws_iam_instance_profile" "demo-node" {
+	name = "terraform-eks-demo"
+	role = aws_iam_role.demo-node.name
 }
-data "aws_iam_instance_profile" "search" {
-  name = "search"
-}
-data "aws_iam_instance_profile" "ads" {
-  name = "ads"
-}
-resource "aws_iam_instance_profile" "demo-node" {}
 
 resource "aws_launch_configuration" "demo" {
   associate_public_ip_address = true
   iam_instance_profile        = aws_iam_instance_profile.demo-node.name
   image_id                    = data.aws_ami.eks-worker.id
-  instance_type               = "t3a.micro"
+  instance_type               = "t3.small"
   name_prefix                 = "terraform-eks-demo"
   security_groups  = [aws_security_group.demo-node.id]
   user_data_base64 = base64encode(local.demo-node-userdata)
@@ -286,6 +279,28 @@ resource "aws_autoscaling_group" "demo" {
     propagate_at_launch = true
   }
 }
+
+resource "aws_eks_node_group" "example" {
+  cluster_name    = aws_eks_cluster.demo.name
+  node_group_name = "example"
+  node_role_arn   = aws_iam_role.demo-node.arn
+  subnet_ids      = aws_subnet.demo.*.id
+
+  scaling_config {
+    desired_size = 1
+    max_size     = 1
+    min_size     = 1
+  }
+
+  # Ensure that IAM Role permissions are created before and deleted after EKS Node Group handling.
+  # Otherwise, EKS will not be able to properly delete EC2 Instances and Elastic Network Interfaces.
+  depends_on = [
+    aws_iam_role_policy_attachment.demo-node-AmazonEKSWorkerNodePolicy,
+    aws_iam_role_policy_attachment.demo-node-AmazonEKS_CNI_Policy,
+    aws_iam_role_policy_attachment.demo-node-AmazonEC2ContainerRegistryReadOnly
+  ]
+}
+
 
 locals {
   config_map_aws_auth = <<CONFIGMAPAWSAUTH
@@ -345,3 +360,30 @@ KUBECONFIG
 output "kubeconfig" {
   value = "${local.kubeconfig}"
 }
+variable "deployment_region" {
+	default = "eu-north-1"
+}
+
+provider "aws" {
+	region = var.deployment_region
+}
+resource "aws_s3_bucket" "qse_s3_bucket" {
+  acl    = "private"
+}
+
+output "bucket_id" {
+	value = aws_s3_bucket.qse_s3_bucket.id
+}
+
+output "bucket_arn" {
+	value = aws_s3_bucket.qse_s3_bucket.arn
+}
+
+output "bucket_domain_name" {
+	value = aws_s3_bucket.qse_s3_bucket.bucket_domain_name
+}
+
+output "bucket_regional_domain_name" {
+	value = aws_s3_bucket.qse_s3_bucket.bucket_regional_domain_name
+}
+
