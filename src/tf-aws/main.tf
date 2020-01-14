@@ -93,7 +93,7 @@ resource "aws_security_group" "demo-cluster" {
 #           to the Kubernetes. You will need to replace A.B.C.D below with
 #           your real IP. Services like icanhazip.com can help you find this.
 resource "aws_security_group_rule" "demo-cluster-ingress-workstation-https" {
-  cidr_blocks       = ["13.53.32.74/32"]
+  cidr_blocks       = ["${var.deploying_machine_public_ip}/32"]
   description       = "Allow workstation to communicate with the cluster API Server"
   from_port         = 443
  protocol          = "tcp"
@@ -360,13 +360,11 @@ KUBECONFIG
 output "kubeconfig" {
   value = "${local.kubeconfig}"
 }
-variable "deployment_region" {
-	default = "eu-north-1"
-}
 
 provider "aws" {
-	region = var.deployment_region
+	region = var.region
 }
+
 resource "aws_s3_bucket" "qse_s3_bucket" {
   acl    = "private"
 }

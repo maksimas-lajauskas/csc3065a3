@@ -1,8 +1,9 @@
 import os
-import subprocess
+from subprocess import run
 import sys
 import datetime
 import shutil
+import requests
 from uuid import uuid1 as uuid
 from string import Template
 from base64 import urlsafe_b64encode
@@ -23,9 +24,11 @@ cfg = {
 	"num_search_pods" : None,
 	"max_num_search_pods" : None,
 	#script actions
+	"create_cluster" : None,
 	"full_run" : None,
 	"build_containers" : None,
 	"write_tf_defs": None,
+	"force_write_pod_defs": None,
 	"deploy" : None,
 	"point_kubectl" : None,
 	#argsvars - gcp
@@ -35,12 +38,15 @@ cfg = {
 	"aws_access_key_id" : None,
 	"aws_secret_access_key" : None,
 	#argsvars - azure
+	"azure_service_tenant_id" : None,
 	"azure_service_principal_id" : None,
 	"azure_service_principal_secret" : None
 }
 
+#constants
 qse_storage_bucket_name = "40073762_QSE_STORAGE_BUCKET_CSC3065_ASSIGNMENT_3"
 docker_repo  = "mlajauskas01/docker-hub:"
+
 def main():
 	try:
 		#configure
@@ -49,14 +55,18 @@ def main():
 		for c in str(cfg).replace("{","").replace("}","").split(", "):
 			print(c)
 		#run
-		if chk_arg("build_containers","true") or chk_arg("full_run","true"):
-			build_containers()
-		if chk_arg("write_tf_defs","true") or chk_arg("full_run","true"):
-			write_tf_defs() #todo
-		if chk_arg("deploy","true") or chk_arg("full_run","true"):
-			deploy() #todo
-		if chk_arg("point_kubectl","true") or chk_arg("full_run","true"):
-			point_kubectl() #todo
+		if chk_argl(["build_containers","full_run"]):
+			build_containers() #1
+		if chk_argl(["write_tf_defs","full_run","create_cluster"]):
+			write_tf_defs(chk_arg("force_write_pod_defs")) #2
+		if chk_argl(["deploy","create_cluster","full_run"]):
+			deploy() #3
+		if chk_argl(["point_kubectl","full_run"]):
+			point_kubectl() #4
+		if chk_argl(["deploy","create_cluster","full_run"]):
+			write_tf_defs(True) #5
+		if chk_argl(["deploy","create_cluster","full_run"]):
+			deploy() #6
 		print("Done")
 		ok = True
 		sys.exit(0)
@@ -66,13 +76,14 @@ def main():
 
 
 #component funcitons
-def chk_argl(arg, lval):
-	for val in lval:
-		if chk_arg(arg, val):
-			return True
+def chk_argl(argl, lval=["true"]):
+	for arg in argl:
+		for val in lval:
+			if chk_arg(arg, val):
+				return True
 	return False
 
-def chk_arg(arg, val):
+def chk_arg(arg, val="true"):
 	try:
 		if cfg[arg] is not None:
 			if cfg[arg].casefold() == val.casefold():
@@ -105,10 +116,10 @@ def help_text():
 
 def build_containers():
 	print("start container build...")
-	login = subprocess.run(["docker","login"]).returncode
+	login = run(["docker","login"]).returncode
 	if login != 0:
 		sys.exit("Bad login, exiting...")
-	ps = subprocess.run(["ps","-e"], capture_output = True)
+	ps = run(["ps","-e"], capture_output = True)
 	print("check - dockerd running..?")
 	if ps.stdout.decode().find("dockerd") != 0:
 		sys.exit("Error: docker daemon not running. Start daemon and re-run script. Exiting...")
@@ -119,58 +130,112 @@ def build_containers():
 		for provider in ["aws","gcp","azure"]:
 			filename = provider+"_storage_interface.py"
 			shutil.copyfile(src=filename,dst=module_name+"/"+filename)
-		outputs.append(subprocess.run(["docker","build","-t",module_name, module_name], capture_output = True))
+		outputs.append(run(["docker","build","-t",module_name, module_name], capture_output = True))
 	#tag & push containers as :latest version
 	print("building images (may take some time depending on upload speed)...")
 	for module_name in containers:
-		outputs.append(subprocess.run(["docker","tag", module_name+":latest", docker_repo+module_name], capture_output = True))
-		outputs.append(subprocess.run(["docker","push", docker_repo+module_name], capture_output = True))
+		outputs.append(run(["docker","tag", module_name+":latest", docker_repo+module_name], capture_output = True))
+		outputs.append(run(["docker","push", docker_repo+module_name], capture_output = True))
 	for output in outputs:
 		if output.returncode != 0:
 			for o in outputs:
 				print(str(o.args)+" --> Exit code: "+o.returncode)
 			sys.exit("There was an error building one or more containers. Check Dockerfiles for errors and re-run or build manually. Exiting...")
 
-def write_tf_defs():
-	if chk_argl("provider",["gcp","aws","azure"]):
+def point_kubectl():
+	if chk_argl(["provider"],["gcp","aws","azure"]):
 		os.chdir("tf-"+cfg["provider"])
 		if chk_arg("provider","gcp"):
+			cmd = run(["gcloud", "container", "clusters", "get-credentials", cfg[gcp_project_id]+"-cluster", "--region", cfg["region"], "--project", cfg[gcp_project_id]], capture_output = True)
+			if cmd.returncode != 0:
+				sys.exit("Couldn't point kubectl to k8s cluster, exiting...")
+		if chk_arg("provider","aws"):
+			outputs = []
+			outputs.append(run(["terraform","output","kubeconfig"], capture_output = True))
+			outputs.append(run(["terraform","output","config_map_aws_auth"], capture_output = True))
+			homekube = os.environ["HOME"]+"/.kube/config"
+			shutil.copyfile(src=homekube,dst=homekube+"_backup_"+uuid.hex)
+			k_cfg = open("homekube","w+")
+			k_cfg.write(outputs[0].stdout.decode())
+			k_cfg.close()
+			cmaa = open("config_map_aws_auth.yaml","w+")
+			cmaa.write(outputs[1].stdout.decode())
+			cmaa.close()
+			outputs.append(run(["kubectl","apply","-f","config_map_aws_auth.yaml"], capture_output = True))
+			for o in outputs:
+				if o.returncode != 0:
+					sys.exit("Error pointing kubectl to k8s cluster, exiting...")
+		if chk_arg("provider","azure"):
+			outputs = []
+			outputs.append(run(["terraform","output","kube_config"], capture_output = True))
+			homekube = os.environ["HOME"]+"/.kube/config"
+			shutil.copyfile(src=homekube,dst=homekube+"_backup_"+uuid.hex)
+			k_cfg = open("homekube","w+")
+			k_cfg.write(outputs[0].stdout.decode())
+			k_cfg.close()
+			for o in outputs:
+				if o.returncode != 0:
+					sys.exit("Error pointing kubectl to k8s cluster, exiting...")
+		os.chdir("..")
+
+def deploy():
+	if chk_argl(["provider"],["gcp","aws","azure"]):
+		os.chdir("tf-"+cfg["provider"])
+		run(["terraform","init"])
+		run(["terraform","apply","-auto-approve"])
+		os.chdir("..")
+
+def write_tf_defs(can_write_pod_defs=False):
+	if chk_argl(["provider"],["gcp","aws","azure"]):
+		pod_env_vars = []
+		varstring = ""
+		os.chdir("tf-"+cfg["provider"])
+		varstring += define_tf_var("region",cfg["region"])
+		varstring += define_tf_var("qse_storage_bucket_name",qse_storage_bucket_name)
+		if chk_arg("provider","gcp"):
 			#deploymentvars.tf for running terraform
-			varstring = ""
 			varstring += define_tf_var("gcp_proj_id",cfg["gcp_project_id"])
-			varstring += define_tf_var("region",cfg["region"])
 			varstring += define_tf_var("gcp_key_json",os.path.abspath(cfg["gcp_service_account_json"]))
-			varstring += define_tf_var("qse_storage_bucket_name",qse_storage_bucket_name)
-			deploymentvars_tf = open("deploymentvars.tf", "w+")
-			deploymentvars_tf.write(varstring)
-			deploymentvars_tf.close()
-			#pods.tf
-			pods_tf = open("pods.tf", "w+")
-				#gcp creds
-			creds = open(os.path.abspath(cfg["gcp_service_account_json"]),"r")
-			pod_env_vars = [("GOOGLE_APPLICATION_CREDENTIALS",str(urlsafe_b64encode(creds.read().encode())))]
-			creds.close()
-				#pod config
-			pod_env_vars.append(("QSE_STORAGE_BUCKET_NAME",qse_storage_bucket_name))
-			pod_env_vars.append(("QSEPROVIDER",cfg["provider"].upper()))
-				#write defs
-			for pod in ["crawler","search","ads"]:
-				pods_tf.write(
-					define_k8s_deployment(
-							app_name=pod,
-							image=docker_repo+pod,
-							env_vars=pod_env_vars,
-							target_replicas=cfg["num_"+pod+"_pods"],
-							max_replicas = cfg["max_num_"+pod+"_pods"]
-						)
-					)
-			pods_tf.close()
+			if can_write_pod_defs:
+				creds = open(os.path.abspath(cfg["gcp_service_account_json"]),"r")
+				pod_env_vars.append(("GOOGLE_APPLICATION_CREDENTIALS",str(urlsafe_b64encode(creds.read().encode()))))#gcp creds
+				creds.close()
+				pod_env_vars.append(("QSE_STORAGE_BUCKET_NAME",qse_storage_bucket_name))#storage bucket name
+				pod_env_vars.append(("QSEPROVIDER",cfg["provider"].upper()))#provider
 		elif chk_arg("provider","aws"):
-			print("AINT DONE YET")
+			varstring += define_tf_var("deploying_machine_public_ip",requests.get("https://ipv4.icanhazip.com/").text[:-2])
+			if can_write_pod_defs:
+				pod_env_vars.append(("aws_access_key_id",cfg["aws_access_key_id"]))
+				pod_env_vars.append(("aws_secret_access_key",cfg["aws_secret_access_key"]))
 		elif chk_arg("provider","azure"):
-			print("AINT DONE YET")
+			varstring += define_tf_var("qse-azure-service-principal-id",cfg["azure_service_principal_id"])
+			varstring += define_tf_var("qse-azure-service-principal-secret",cfg["azure_service_principal_secret"])
+			if can_write_pod_defs:
+				pod_env_vars.append(("AZURE_TENANT_ID",cfg["azure_service_tenant_id1"]))
+				pod_env_vars.append(("AZURE_CLIENT_ID",cfg["azure_service_principal_id"]))
+				pod_env_vars.append(("AZURE_CLIENT_SECRET",cfg["azure_service_principal_secret"]))
 	else:
 		sys.exit("Uknown provider")
+	#deployment vars write
+	deploymentvars_tf = open("deploymentvars.tf", "w+")
+	deploymentvars_tf.write(varstring)
+	deploymentvars_tf.close()
+	#pods.tf
+	if can_write_pod_defs:
+		pods_tf = open("pods.tf", "w+")
+			#write defs
+		for pod in ["crawler","search","ads"]:
+			pods_tf.write(
+				define_k8s_deployment(
+						app_name=pod,
+						image=docker_repo+pod,
+						env_vars=pod_env_vars,
+						target_replicas=cfg["num_"+pod+"_pods"],
+						max_replicas = cfg["max_num_"+pod+"_pods"]
+					)
+				)
+		pods_tf.close()
+	os.chdir("..")#return to src dir
 
 def define_tf_var(name, value):
 	template = Template("variable $name {\n\tdefault = $value\n}\n")
@@ -186,7 +251,7 @@ def define_k8s_deployment(app_name, image, env_vars = [], target_replicas = None
 		max_replicas = target_replicas + 1
 	i = 0
 	for pair in env_vars:
-		if pair[1].find(".") < 0 and type(pair[1]) == type("string"):
+		if pair[1].find(".") < 0 and type(pair[1]) == type("string") and pair[1][:1]+pair[1][-1:] != "\"\"":
 			env_vars[i] = (pair[0],"\""+pair[1]+"\"")
 		i += 1
 	env_template = Template("""\n\t\t\t\t\tenv {\n\t\t\t\t\t\tname = "$env_name"\n\t\t\t\t\t\tvalue = $env_value\n\t\t\t\t\t}\n""")

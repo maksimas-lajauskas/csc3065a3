@@ -26,7 +26,7 @@ resource "azurerm_storage_account" "qse" {
 }
 
 resource "azurerm_storage_container" "qse" {
-  name                  = "qse-data"
+  name                  = var.qse_storage_bucket_name
   resource_group_name   = azurerm_resource_group.qse.name
   storage_account_name  = azurerm_storage_account.qse.name
   container_access_type = "private"

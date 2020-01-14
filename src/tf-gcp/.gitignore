@@ -1,2 +1,4 @@
 deploymentvars.tf
 pods.tf
+*.tfstate*
+.terraform/
