@@ -155,7 +155,7 @@ def point_kubectl():
 			outputs.append(run(["terraform","output","kubeconfig"], capture_output = True))
 			outputs.append(run(["terraform","output","config_map_aws_auth"], capture_output = True))
 			homekube = os.environ["HOME"]+"/.kube/config"
-			shutil.copyfile(src=homekube,dst=homekube+"_backup_"+uuid.hex)
+			shutil.copyfile(src=homekube,dst=homekube+"_backup_"+uuid().hex)
 			k_cfg = open("homekube","w+")
 			k_cfg.write(outputs[0].stdout.decode())
 			k_cfg.close()
@@ -170,7 +170,7 @@ def point_kubectl():
 			outputs = []
 			outputs.append(run(["terraform","output","kube_config"], capture_output = True))
 			homekube = os.environ["HOME"]+"/.kube/config"
-			shutil.copyfile(src=homekube,dst=homekube+"_backup_"+uuid.hex)
+			shutil.copyfile(src=homekube,dst=homekube+"_backup_"+uuid().hex)
 			k_cfg = open("homekube","w+")
 			k_cfg.write(outputs[0].stdout.decode())
 			k_cfg.close()
