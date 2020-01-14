@@ -212,6 +212,7 @@ def write_tf_defs(can_write_pod_defs=False):
 			if chk_arg("provider","gcp"):
 				ogpath = os.path.abspath(cfg["gcp_service_account_json"])
 				newpath = cfg["gcp_service_account_json"].split("/")[-1:][0]
+				print("OLDPATH: " + str(ogpath))
 				print("NEWPATH: " + newpath)
 				shutil.copyfile(src=ogpath,dst=newpath)
 				cfg["gcp_service_account_json"] = newpath
