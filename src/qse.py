@@ -152,7 +152,7 @@ def point_kubectl():
 		os.chdir("tf-"+cfg["provider"])
 		if chk_arg("provider","gcp"):
 			cluster_name = cfg["gcp_project_id"]+"-cluster"
-			reigon = cfg["region"]
+			region = cfg["region"]
 			gcp_project_id = cfg["gcp_project_id"]
 			cmdlist = ["gcloud", "container", "clusters", "get-credentials", cluster_name, "--region", region, "--project", gcp_project_id]
 			cmd = subprocess.run(cmdlist,capture_output=True)
