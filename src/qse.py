@@ -184,6 +184,8 @@ def point_kubectl():
 			try:
 				shutil.copyfile(src=homekube,dst=homekube+"_backup_"+uuid().hex)
 			except:
+				os.mkdir(os.environ["HOME"]+"/.kube")
+				shutil.copyfile(src=homekube,dst=homekube+"_backup_"+uuid().hex)
 				print("Couldn't copy, writing anyway")
 			k_cfg = open(homekube,"w+")
 			k_cfg.write(outputs[0].stdout.decode())
