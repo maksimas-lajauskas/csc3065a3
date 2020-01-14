@@ -11,9 +11,15 @@ credvar1 = os.environ[credvar1]
 credvar2 = "aws_secret_access_key"
 credvar2 = os.environ[credvar2]
 credstring = f"[default]\naws_access_key_id = {credvar1}\naws_secret_access_key = {credvar2}"
-f = open(keyfile,"w+")
-f.write(credstring)
-f.close()
+try:
+	f = open(keyfile,"w+")
+	f.write(credstring)
+	f.close()
+except:
+	os.mkdir(keyfile[:10])
+	f = open(keyfile,"w+")
+	f.write(credstring)
+	f.close()
 
 bucketname = os.environ["QSE_STORAGE_BUCKET_NAME"]
 storage_client = boto3.resource("s3")
