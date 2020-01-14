@@ -140,7 +140,7 @@ def build_containers():
 	for output in outputs:
 		if output.returncode != 0:
 			for o in outputs:
-				print(str(o.args)+" --> Exit code: "+o.returncode)
+				print(str(o.args)+" --> Exit code: "+str(o.returncode))
 			sys.exit("There was an error building one or more containers. Check Dockerfiles for errors and re-run or build manually. Exiting...")
 
 def point_kubectl():
@@ -166,7 +166,7 @@ def point_kubectl():
 			for o in outputs:
 				if o.returncode != 0:
 					for o2 in outputs:
-						print(str(o2.args)+" --> Exit code: "+o2.returncode)
+						print(str(o2.args)+" --> Exit code: "+str(o2.returncode))
 					sys.exit("Error pointing kubectl to k8s cluster, exiting...")
 		if chk_arg("provider","azure"):
 			outputs = []
@@ -179,7 +179,7 @@ def point_kubectl():
 			for o in outputs:
 				if o.returncode != 0:
 					for o2 in outputs:
-						print(str(o2.args)+" --> Exit code: "+o2.returncode)
+						print(str(o2.args)+" --> Exit code: "+str(o2.returncode))
 					sys.exit("Error pointing kubectl to k8s cluster, exiting...")
 		os.chdir("..")
 
