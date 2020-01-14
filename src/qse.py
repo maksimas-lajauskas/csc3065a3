@@ -4,6 +4,7 @@ import sys
 import datetime
 import shutil
 import requests
+import traceback
 from uuid import uuid1 as uuid
 from string import Template
 from base64 import urlsafe_b64encode
@@ -74,7 +75,9 @@ def main():
 		sys.exit(0)
 	except:
 		if str(sys.exc_info()[1]) != str(SystemExit(0)):
-			sys.exit("ERROR: "+str(sys.exc_info()))
+			err = sys.exc_info()
+			err[2].print_tb()
+			sys.exit("ERROR: "+str(err))
 
 
 #component funcitons
