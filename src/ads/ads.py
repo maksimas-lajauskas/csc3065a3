@@ -85,7 +85,7 @@ def build_img(filename, imgdata):
         size = (imgdata["img_width"], imgdata["img_height"]),
         data = imgdata["img_bytes"]
         )
-        img.save("/static/"+filename)
+        img.save(os.path.abspath("/static/"+filename))
         remove_candidates.append((datetime.datetime.utcnow().timestamp(), filename))
         return True
     except:
@@ -120,7 +120,7 @@ def page_separator():
 def cleanup():
     for item in remove_candidates:
         if item[0]+common_image_file_persist_seconds < datetime.datetime.utcnow().timestamp():
-            os.remove("/static/"+item[1])
+            os.remove(os.path.abspath("/static/"+item[1]))
             remove_candidates.remove(item)
 
     
