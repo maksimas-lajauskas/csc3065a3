@@ -72,7 +72,7 @@ def main():
 			deploy() #6
 		print("Done")
 		if chk_arg("provider","azure"):
-			print("To use kubectl with qse on azure please run the following command:\n"+azure_kubesync_cmd)
+			print("Run the following command after 'full_run=true' or 'deploy=true + point_kubectl=true' finish successfully to use kubectl on azure:\n"+azure_kubesync_cmd)
 		sys.exit(0)
 	except:
 		if str(sys.exc_info()[1]) != str(SystemExit(0)):
@@ -254,7 +254,7 @@ def write_tf_defs(can_write_pod_defs=False):
 			pods_tf.write(
 				define_k8s_deployment(
 						app_name=pod,
-						image=docker_repo+pod,
+						image=docker_repo+pod+get_sha_affix(pod),
 						env_vars=pod_env_vars,
 						target_replicas=cfg["num_"+pod+"_pods"],
 						max_replicas = cfg["max_num_"+pod+"_pods"]
@@ -262,6 +262,26 @@ def write_tf_defs(can_write_pod_defs=False):
 				)
 		pods_tf.close()
 	os.chdir("..")#return to src dir
+
+def get_sha_affix(pod):
+	pull = subprocess.run(["docker","pull",docker_repo+pod],capture_output=True)
+	raw = subprocess.run(["docker","images","--digests"],capture_output=True)
+	lines = raw.stdout.decode().split("\n")
+	good_lines = []
+	for line in lines:
+		words = line.split(" ")
+		good_words = []
+		if len(words) == 0:
+			continue
+		for word in words:
+			if len(word) > 0 and word != " ":
+				good_words.append(word)
+		good_lines.append(good_words)	
+	for line in good_lines:
+		if line[0] == docker_repo[:-1] and line[1] == pod:
+			return "@"+line[2]
+	return ""
+
 
 def define_tf_var(name, value):
 	template = Template("variable $name {\n\tdefault = $value\n}\n")
