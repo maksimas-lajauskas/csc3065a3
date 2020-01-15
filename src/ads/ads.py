@@ -89,6 +89,7 @@ def build_img(filename, imgdata):
         remove_candidates.append((datetime.datetime.utcnow().timestamp(), filename))
         return True
     except:
+        print(sys.exc_info())
         return False
 
 

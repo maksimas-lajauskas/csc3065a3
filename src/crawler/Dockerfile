@@ -1,7 +1,8 @@
 FROM debian
 RUN apt-get update \
     && apt-get install -y python3 python3-pip nano less procps manpages man \
-    && pip3 install requests bs4 lxml flask waitress google-cloud-storage azure-storage-blob boto3
+    && pip3 install requests bs4 lxml flask waitress google-cloud-storage azure-storage-blob boto3 \
+    && mkdir /static
 COPY . .
-#CMD ["python3", "/crawler.py"]
-CMD ["ping", "google.com"]
+CMD ["python3", "/crawler.py"]
+#CMD ["ping", "google.com"]
