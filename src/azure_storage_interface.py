@@ -7,9 +7,9 @@ import sys
 
 #init environment
 token_credential = DefaultAzureCredential()
+accountname = os.environ["azure_storage_account_name"]
 storage_client = BlobServiceClient(account_url="https://"+accountname+".blob.core.windows.net", credential=token_credential)
 bucketname = os.environ["QSE_STORAGE_BUCKET_NAME"]
-accountname = os.environ["azure_storage_account_name"]
 bucket = storage_client.get_container_client(bucketname)
 
 def blob_to_string(blob):
