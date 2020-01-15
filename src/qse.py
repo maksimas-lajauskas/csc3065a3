@@ -230,7 +230,7 @@ def write_tf_defs(can_write_pod_defs=False):
 			if can_write_pod_defs:
 				pod_env_vars.append(("aws_access_key_id",cfg["aws_access_key_id"]))
 				pod_env_vars.append(("aws_secret_access_key",cfg["aws_secret_access_key"]))
-				pod_env_vars.append(("QSE_STORAGE_BUCKET_NAME","aws_s3_bucket.qse_s3_bucket.bucket_domain_name"))#storage bucket name
+				pod_env_vars.append(("QSE_STORAGE_BUCKET_NAME","aws_s3_bucket.qse_s3_bucket.bucket_id"))#storage bucket name
 		elif chk_arg("provider","azure"):
 			varstring += define_tf_var("qse-azure-service-principal-id",cfg["azure_service_principal_id"])
 			varstring += define_tf_var("qse-azure-service-principal-secret",cfg["azure_service_principal_secret"])
@@ -249,6 +249,7 @@ def write_tf_defs(can_write_pod_defs=False):
 	if can_write_pod_defs:
 		pod_env_vars.append(("QSEPROVIDER",cfg["provider"].upper()))#provider
 		pods_tf = open("pods.tf", "w+")
+		services_tf = open("services.tf","w+")
 			#write defs
 		for pod in ["crawler","search","ads"]:
 			pods_tf.write(
@@ -260,7 +261,11 @@ def write_tf_defs(can_write_pod_defs=False):
 						max_replicas = cfg["max_num_"+pod+"_pods"]
 					)
 				)
+			services_tf.write(
+					define_k8s_load_balancer(app_name=pod)
+				)
 		pods_tf.close()
+		services_tf.close()
 	os.chdir("..")#return to src dir
 
 def get_sha_affix(pod):
@@ -289,6 +294,30 @@ def define_tf_var(name, value):
 	if type(value) == type("string") and value[:1] != "\"" and value[-1:] != "\"":
 		value = "\""+value+"\""
 	return template.substitute(name=name,value=value)
+
+def define_k8s_load_balancer(app_name):
+	template = Template("""
+resource "kubernetes_service" "$app_name-service" {
+  metadata {
+    name = "$app_name-service"
+  }
+  spec {
+    selector = {
+      App = kubernetes_deployment.$app_name.spec.0.template.0.metadata[0].labels.App
+    }
+    port {
+      port        = 80
+      target_port = 80
+    }
+    type = "LoadBalancer"
+  }
+}
+
+output "lb-$app_name" {
+value = kubernetes_service.$app_name-service.load_balancer_ingress[0]
+}
+""")
+	return template.substitute(app_name=app_name)
 
 def define_k8s_deployment(app_name, image, env_vars = [], target_replicas = None, max_replicas = None, port=80):
 	if target_replicas is None:
