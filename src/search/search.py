@@ -94,7 +94,7 @@ def serve_page():
   rqa = request.args  
   try:
       ads_payload = build_ads_payload(ads_query(rqa.get("q")))
-      results_payload = query(rqa.get("q"))
+      results_payload = search_query(rqa.get("q"))
       cleanup()
       return render_template("serp.html", ads_payload=ads_payload, results_payload=results_payload)
   except:
