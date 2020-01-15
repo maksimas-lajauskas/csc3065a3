@@ -81,9 +81,9 @@ def handle_write(url, text, img):
 def build_img(filename, imgdata):
     try:
         img = Image.frombytes(
-        mode = imgdata.get("img_mode"),
-        size = (imgdata.get("img_width"), imgdata.get("img_height")),
-        data = imgdata.get("img_bytes")
+        mode = imgdata["img_mode"],
+        size = (imgdata["img_width"], imgdata["img_height"]),
+        data = imgdata["img_bytes"]
         )
         img.save("/static/"+filename)
         remove_candidates.append((datetime.datetime.utcnow().timestamp(), filename))
@@ -95,10 +95,10 @@ def build_img(filename, imgdata):
 
 def build_ads_payload(results):
     ads_payload = {}
-    for result in results:
+    for result in results.keys():
         filename = uuid().hex+".gif"
-        if build_img(filename, result) is True:
-            ads_payload[result["data"]["url"]] = filename
+        if build_img(filename, results[result]) is True:
+            ads_payload[result] = filename
     return ads_payload
 
 

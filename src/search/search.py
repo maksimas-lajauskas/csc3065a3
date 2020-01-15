@@ -51,29 +51,31 @@ elif os.environ["QSEPROVIDER"] == "AZURE":
 def build_img(filename, imgdata):
     try:
         img = Image.frombytes(
-        mode = imgdata.get("img_mode"),
-        size = (imgdata.get("img_width"), imgdata.get("img_height")),
-        data = imgdata.get("img_bytes")
+        mode = imgdata["img_mode"],
+        size = (imgdata["img_width"], imgdata["img_height"]),
+        data = imgdata["img_bytes"]
         )
-        img.save("/static/"+filename)
+        img.save(os.path.abspath("/static/"+filename))
         remove_candidates.append((datetime.datetime.utcnow().timestamp(), filename))
         return True
     except:
+        print(sys.exc_info())
         return False
 
 
 def build_ads_payload(results):
     ads_payload = {}
-    for result in results:
+    for result in results.keys():
         filename = uuid().hex+".gif"
-        if build_img(filename, result) is True:
-            ads_payload[result["data"]["url"]] = filename
+        if build_img(filename, results[result]) is True:
+            ads_payload[result] = filename
     return ads_payload
+
 
 def cleanup():
     for item in remove_candidates:
         if item[0]+common_image_file_persist_seconds < datetime.datetime.utcnow().timestamp():
-            os.remove("/static/"+item[1])
+            os.remove(os.path.abspath("/static/"+item[1]))
             remove_candidates.remove(item)
 
 
