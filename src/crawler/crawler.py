@@ -54,6 +54,7 @@ def rand_ip():
         domain_name = socket.gethostbyaddr(addr_str)[0]  # reverse dns lookup oneliner
         return domain_name
     except:
+        record_error()
         return domain_name
 
 
@@ -74,20 +75,34 @@ def crawl_url(addr_str):
         entry["data"]["pagetext"] = bs.text
         write(header = entry["header"],data = json.dumps(entry).encode())
     except:
+        record_error()
         write(header = entry["header"],data = json.dumps(entry).encode())
 
 
 def main_loop():
-    q = locate_blob_prefix("ticket-")
-    if q is not None:
-        ticket = json.loads(blob_to_string(q))
-        delete_blob(q)
-        crawl_url(ticket["data"])
-    else:
-        crawl_url(rand_ip)
+    while True:
+        try:
+            q = locate_blob_prefix("ticket-")
+            if q is not None:
+                ticket = json.loads(blob_to_string(q))
+                delete_blob(q)
+                crawl_url(ticket["data"])
+            else:
+                crawl_url(rand_ip)
+        except:
+            record_error()
+            continue
 
 
 crawler_thread = threading.Thread(target = main_loop , daemon = True)
+
+def record_error():
+    f = open("LOGFILE","a+")
+    e = sys.exc_info()
+    f.write(str(e)+"\n"+str(traceback.extract_tb(e[2])))
+    f.close()
+ 
+
 
 def run():
     crawler_thread.start()

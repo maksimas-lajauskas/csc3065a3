@@ -50,11 +50,15 @@ elif os.environ["QSEPROVIDER"] == "AZURE":
     from azure_storage_interface import search_query
 
 def get_image_from_url(url):
-    filename = uuid().hex
-    subprocess.call(["wget","-O",filename,url])
-    img = Image.open(filename)
-    subprocess.call(["rm",filename])
-    return img
+    try:
+        filename = uuid().hex
+        subprocess.call(["wget","-O",filename,url])
+        img = Image.open(filename)
+        subprocess.call(["rm",filename])
+        return img
+    except:
+        record_error()
+        return None
 
 
 def handle_write(url, text, img):
@@ -76,6 +80,7 @@ def handle_write(url, text, img):
         write(data = data, header = header)
         return True
     except:
+        record_error()
         return False
 
 
@@ -90,16 +95,20 @@ def build_img(filename, imgdata):
         remove_candidates.append((datetime.datetime.utcnow().timestamp(), filename))
         return True
     except:
-        print(sys.exc_info())
+        record_error()
         return False
 
 
 def build_ads_payload(results):
     ads_payload = {}
     for result in results.keys():
-        filename = uuid().hex+".gif"
-        if build_img(filename, results[result]) is True:
-            ads_payload[result] = filename
+        try:
+            filename = uuid().hex+".gif"
+            if build_img(filename, results[result]) is True:
+                ads_payload[result] = filename
+        except:
+            record_error()
+            continue
     return ads_payload
 
 
@@ -115,20 +124,27 @@ def page_separator():
       return render_template("serp.html", ads_payload=ads_payload)
   except:
       cleanup()
-      f = open("LOGFILE","a+")
-      e = sys.exc_info()
-      f.write(str(e)+"\n"+str(traceback.extract_tb(e[2])))
-      f.close()
+      record_error()
       return render_template("index.html")
 
 
 def cleanup():
     for item in remove_candidates:
-        if item[0]+common_image_file_persist_seconds < datetime.datetime.utcnow().timestamp():
-            os.remove(os.path.abspath("/static/"+item[1]))
-            remove_candidates.remove(item)
+        try:
+            if item[0]+common_image_file_persist_seconds < datetime.datetime.utcnow().timestamp():
+                os.remove(os.path.abspath("/static/"+item[1]))
+                remove_candidates.remove(item)
+        except:
+            record_error()
+            continue
 
-    
+
+def record_error():
+    f = open("LOGFILE","a+")
+    e = sys.exc_info()
+    f.write(str(e)+"\n"+str(traceback.extract_tb(e[2])))
+    f.close()
+        
 #run server
 def run():
   serve(app, host='0.0.0.0', port=80)

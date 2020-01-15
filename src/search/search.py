@@ -60,24 +60,32 @@ def build_img(filename, imgdata):
         remove_candidates.append((datetime.datetime.utcnow().timestamp(), filename))
         return True
     except:
-        print(sys.exc_info())
+        record_error()
         return False
 
 
 def build_ads_payload(results):
     ads_payload = {}
     for result in results.keys():
-        filename = uuid().hex+".gif"
-        if build_img(filename, results[result]) is True:
-            ads_payload[result] = filename
+        try:
+            filename = uuid().hex+".gif"
+            if build_img(filename, results[result]) is True:
+                ads_payload[result] = filename
+        except:
+            record_error()
+            continue
     return ads_payload
 
 
 def cleanup():
     for item in remove_candidates:
-        if item[0]+common_image_file_persist_seconds < datetime.datetime.utcnow().timestamp():
-            os.remove(os.path.abspath("/static/"+item[1]))
-            remove_candidates.remove(item)
+        try:
+            if item[0]+common_image_file_persist_seconds < datetime.datetime.utcnow().timestamp():
+                os.remove(os.path.abspath("/static/"+item[1]))
+                remove_candidates.remove(item)
+        except:
+            record_error()
+            continue
 
 
 #THE SEP-arator (because / separates files and also stands for Search Engine Page and also method separates blank page from query page calls, endless fun!)
@@ -91,13 +99,15 @@ def serve_page():
       return render_template("serp.html", ads_payload=ads_payload, results_payload=results_payload)
   except:
       cleanup()
-      f = open("LOGFILE","a+")
-      e = sys.exc_info()
-      f.write(str(e)+"\n"+str(traceback.extract_tb(e[2])))
-      f.close()
+      record_error()
       return render_template("index.html")
 
-    
+def record_error():
+    f = open("LOGFILE","a+")
+    e = sys.exc_info()
+    f.write(str(e)+"\n"+str(traceback.extract_tb(e[2])))
+    f.close()
+     
 #run server
 def run():
   serve(app, host='0.0.0.0', port=80)
