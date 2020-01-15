@@ -1,2 +1,0 @@
-#!/bin/bash
-export "$1"="$2"
