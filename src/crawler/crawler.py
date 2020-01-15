@@ -62,7 +62,8 @@ def crawl_url(addr_str):
     # send request
     req = None
     prefix = ""
-    entry = {"header": f"webpage-{prefix+addr_str}", "data": {"url": prefix+addr_str, "pagetext": "qse-not-available"}, "timestamp": str(datetime.datetime.utcnow().timestamp()) }
+    timestamp = datetime.datetime.utcnow().timestamp()
+    entry = {"header": f"webpage-{prefix+addr_str}", "data": {"url": prefix+addr_str, "pagetext": "qse-not-available"}, "timestamp": str(timestamp)}
     if addr_str[:4] != "http":
         prefix = "https://"
     try:
