@@ -63,7 +63,7 @@ def crawl_url(addr_str):
     req = None
     prefix = ""
     timestamp = datetime.datetime.utcnow().timestamp()
-    entry = {"header": f"webpage-{prefix+addr_str}", "data": {"url": prefix+addr_str, "pagetext": "qse-not-available"}, "timestamp": str(timestamp)}
+    entry = {"header": f"webpage-{prefix+addr_str}", "data": {"url": prefix+addr_str, "pagetext": "qse-not-available"}, "timestamp": timestamp }
     if addr_str[:4] != "http":
         prefix = "https://"
     try:
@@ -89,7 +89,7 @@ def main_loop():
                 delete_blob(q)
                 crawl_url(ticket["data"])
             else:
-                crawl_url(rand_ip)
+                crawl_url(rand_ip())
         except:
             record_error()
             continue
