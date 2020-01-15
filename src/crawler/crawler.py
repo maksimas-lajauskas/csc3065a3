@@ -1,5 +1,6 @@
 # Superbasic crawler implementation - Maksimas Lajauskas 40073762
 import socket
+import traceback
 from random import getrandbits
 from ipaddress import IPv4Address
 import requests

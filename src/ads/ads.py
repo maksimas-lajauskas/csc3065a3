@@ -1,4 +1,5 @@
 import subprocess
+import traceback
 from uuid import uuid1 as uuid
 from PIL import Image
 from flask import Flask, render_template, request
@@ -114,6 +115,10 @@ def page_separator():
       return render_template("serp.html", ads_payload=ads_payload)
   except:
       cleanup()
+      f = open("LOGFILE","a+")
+      e = sys.exc_info()
+      f.write(str(e)+"\n"+str(traceback.extract_tb(e[2])))
+      f.close()
       return render_template("index.html")
 
 

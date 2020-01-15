@@ -1,5 +1,6 @@
 # Superbasic crawler implementation - Maksimas Lajauskas 40073762
 from uuid import uuid1 as uuid
+import traceback
 from PIL import Image
 from flask import Flask, request, render_template
 from waitress import serve
@@ -90,6 +91,10 @@ def serve_page():
       return render_template("serp.html", ads_payload=ads_payload, results_payload=results_payload)
   except:
       cleanup()
+      f = open("LOGFILE","a+")
+      e = sys.exc_info()
+      f.write(str(e)+"\n"+str(traceback.extract_tb(e[2])))
+      f.close()
       return render_template("index.html")
 
     
