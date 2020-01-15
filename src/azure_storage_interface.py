@@ -14,7 +14,12 @@ bucket = storage_client.get_container_client(bucketname)
 
 def blob_to_string(blob):
 	try:
-		return blob.download_blob().readall().decode()
+		bytestring = blob.download_blob().readall()
+		checkstring = "{\"header\": \"".encode()
+		if bytestring[:len(checkstring)] == checkstring:
+			return bytestring.decode()
+		else:
+			return None
 	except:
 		print(sys.exc_info())
 		return None

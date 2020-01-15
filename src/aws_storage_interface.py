@@ -22,7 +22,12 @@ bucket = storage_client.Bucket(bucketname)
 
 def blob_to_string(blob):
 	try:
-		return blob.get()["Body"].read().decode()
+		bytestring = blob.get()["Body"].read()
+		checkstring = "{\"header\": \"".encode()
+		if bytestring[:len(checkstring)] == checkstring:
+			return bytestring.decode()
+		else:
+			return None
 	except:
 		print(sys.exc_info())
 		return None
