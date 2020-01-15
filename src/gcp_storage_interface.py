@@ -27,9 +27,11 @@ def blob_to_string(blob):
 def locate_blob_prefix(prefix):
 	for blob in bucket.list_blobs():
 		try:
-			j = json.loads(blob_to_string(blob))
-			if j["header"][:len(prefix)] == prefix:
-				return blob
+			b = blob_to_string(blob)
+			if b is not None:
+				j = json.loads(b)
+				if j["header"][:len(prefix)] == prefix:
+					return blob
 		except:
 			continue
 	return None
@@ -37,18 +39,22 @@ def locate_blob_prefix(prefix):
 def delete_blob(header):
 	for blob in bucket.list_blobs():
 		try:
-			j = json.loads(blob_to_string(blob))
-			if j["header"] == header:
-				blob.delete()
+			b = blob_to_string(blob)
+			if b is not None:
+				j = json.loads(blob)
+				if j["header"] == header:
+					blob.delete()
 		except:
 			continue
 
 def locate_blob_exact(header):
 	for blob in bucket.list_blobs():
 		try:
-			j = json.loads(blob_to_string(blob))
-			if j["header"] == header:
-				return blob
+			b = blob_to_string(blob)
+			if b is not None:
+				j = json.loads(b)
+				if j["header"] == header:
+					return blob
 		except:
 			continue
 	return None
@@ -58,19 +64,21 @@ def ads_query(query_string):
 	query_string_tokenised = query_string.split(" ")
 	for blob in bucket.list_blobs():
 		try:
-			j = json.loads(blob_to_string(blob))
-			if j["header"][:7] == "advert-":
-				matchscore = 0
-				for i in query_string_tokenised:
-					if j["data"]["keywords"].casefold().find(i.casefold()) >= 0:
-						matchscore += 1
-				if matchscore == 0:
-					continue
-				else:
-					results[j["data"]["url"]] = {"img_height" : j["data"]["img_height"],
-					"img_width": j["data"]["img_width"],
-					"img_mode": j["data"]["img_mode"],
-					"img_bytes": bucket.blob(j["data"]["img_bytes"]).download_as_string()}
+			b = blob_to_string(blob)
+			if b is not None:
+				j = json.loads(b)
+				if j["header"][:7] == "advert-":
+					matchscore = 0
+					for i in query_string_tokenised:
+						if j["data"]["keywords"].casefold().find(i.casefold()) >= 0:
+							matchscore += 1
+					if matchscore == 0:
+						continue
+					else:
+						results[j["data"]["url"]] = {"img_height" : j["data"]["img_height"],
+						"img_width": j["data"]["img_width"],
+						"img_mode": j["data"]["img_mode"],
+						"img_bytes": bucket.blob(j["data"]["img_bytes"]).download_as_string()}
 		except:
 			print(sys.exc_info())
 			continue
@@ -81,16 +89,18 @@ def search_query(query_string):
 	query_string_tokenised = query_string.split(" ")
 	for blob in bucket.list_blobs():
 		try:
-			j = json.loads(blob_to_string(blob))
-			if j["header"][:8] == "webpage-":
-				matchscore = 0
-				for i in query_string_tokenised:
-					if j["data"]["pagetext"].casefold().find(i.casefold()) >= 0:
-						matchscore += 1
-				if matchscore != len(query_string_tokenised):
-					continue
-				else:
-					results[j["data"]["url"]] = j["data"]["pagetext"][:100].replace("\n"," ").replace("<!--", "").replace("-->", "")+"..."
+			b = blob_to_string(blob)
+			if b is not None:
+				j = json.loads(b)
+				if j["header"][:8] == "webpage-":
+					matchscore = 0
+					for i in query_string_tokenised:
+						if j["data"]["pagetext"].casefold().find(i.casefold()) >= 0:
+							matchscore += 1
+					if matchscore != len(query_string_tokenised):
+						continue
+					else:
+						results[j["data"]["url"]] = j["data"]["pagetext"][:100].replace("\n"," ").replace("<!--", "").replace("-->", "")+"..."
 		except:
 			continue
 			print(sys.exc_info())
