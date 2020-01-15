@@ -122,7 +122,7 @@ def help_text():
 
 def build_containers():
 	print("start container build...")
-	login = subprocess.run(["docker","login"]).returncode
+	login = subprocess.run(["sudo","docker","login"]).returncode
 	if login != 0:
 		sys.exit("Bad login, exiting...")
 	ps = subprocess.run(["ps","-e"],capture_output=True)
@@ -136,12 +136,12 @@ def build_containers():
 		for provider in ["aws","gcp","azure"]:
 			filename = provider+"_storage_interface.py"
 			shutil.copyfile(src=filename,dst=module_name+"/"+filename)
-		outputs.append(subprocess.run(["docker","build","-t",module_name, module_name],capture_output=True))
+		outputs.append(subprocess.run(["sudo","docker","build","-t",module_name, module_name],capture_output=True))
 	#tag & push containers as :latest version
 	print("pushing images (may take some time depending on upload speed)...")
 	for module_name in ["crawler","ads","search"]:
-		outputs.append(subprocess.run(["docker","tag", module_name+":latest", docker_repo+module_name],capture_output=True))
-		outputs.append(subprocess.run(["docker","push", docker_repo+module_name],capture_output=True))
+		outputs.append(subprocess.run(["sudo","docker","tag", module_name+":latest", docker_repo+module_name],capture_output=True))
+		outputs.append(subprocess.run(["sudo","docker","push", docker_repo+module_name],capture_output=True))
 	for output in outputs:
 		if output.returncode != 0:
 			for o in outputs:
@@ -264,8 +264,8 @@ def write_tf_defs(can_write_pod_defs=False):
 	os.chdir("..")#return to src dir
 
 def get_sha_affix(pod):
-	pull = subprocess.run(["docker","pull",docker_repo+pod],capture_output=True)
-	raw = subprocess.run(["docker","images","--digests"],capture_output=True)
+	pull = subprocess.run(["sudo","docker","pull",docker_repo+pod],capture_output=True)
+	raw = subprocess.run(["sudo","docker","images","--digests"],capture_output=True)
 	lines = raw.stdout.decode().split("\n")
 	good_lines = []
 	for line in lines:
